@@ -1,2 +1,8 @@
 [build-system]
 requires = ["setuptools", "setuptools_scm", "Cython >= 0.29.23", "numpy>=2.0.0rc1"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+write_to = "fastparquet/_version.py"
+version_scheme = "guess-next-dev"
+local_scheme = "no-local-version"
