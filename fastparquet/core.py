@@ -200,7 +200,7 @@ def read_dictionary_page(file_obj, schema_helper, page_header, column_metadata, 
 
 def read_data_page_v2(infile, schema_helper, se, data_header2, cmd,
                       dic, assign, num, use_cat, file_offset, ph, idx=None,
-                      selfmade=False, row_filter=None):
+                      selfmade=False, row_filter=None, remap_array=None):
     """
     :param infile: open file
     :param schema_helper:
@@ -211,6 +211,7 @@ def read_data_page_v2(infile, schema_helper, se, data_header2, cmd,
     :param assign: output array (all of it)
     :param num: offset, rows so far
     :param use_cat: output is categorical?
+    :param remap_array: array for remapping categorical indices
     :return: None
 
     test data "/Users/mdurant/Downloads/datapage_v2.snappy.parquet"
@@ -338,6 +339,9 @@ def read_data_page_v2(infile, schema_helper, se, data_header2, cmd,
         if bit_width in [8, 16, 32] and selfmade:
             # special fastpath for cats
             outbytes = raw_bytes[pagefile.tell():]
+            if remap_array is not None:
+                # Apply remapping to outbytes.
+                outbytes = remap_array[outbytes]
             if len(outbytes) == assign[num:num+data_header2.num_values].nbytes:
                 assign[num:num+data_header2.num_values].view('uint8')[row_filter] = outbytes[row_filter]
             else:
@@ -358,6 +362,9 @@ def read_data_page_v2(infile, schema_helper, se, data_header2, cmd,
                     encoding.NumpyIO(assign[num:num+data_header2.num_values].view('uint8')),
                     itemsize=bit_width
                 )
+                if remap_array is not None:
+                    # Apply remapping after reading
+                    assign[num:num+data_header2.num_values] = remap_array[assign[num:num+data_header2.num_values]]
             else:
                 temp = np.empty(data_header2.num_values, assign.dtype)
                 encoding.read_rle_bit_packed_hybrid(
@@ -367,6 +374,8 @@ def read_data_page_v2(infile, schema_helper, se, data_header2, cmd,
                     encoding.NumpyIO(temp.view('uint8')),
                     itemsize=bit_width
                 )
+                if remap_array is not None:
+                    temp = remap_array[temp]
                 if not nullable:
                     assign[num:num+data_header2.num_values][nulls[row_filter]] = None
                 assign[num:num+data_header2.num_values][~nulls[row_filter]] = temp[row_filter]
@@ -429,7 +438,7 @@ def read_data_page_v2(infile, schema_helper, se, data_header2, cmd,
 
 def read_col(column, schema_helper, infile, use_cat=False,
              selfmade=False, assign=None, catdef=None,
-             row_filter=None):
+             row_filter=None, global_cats=None):
     """Using the given metadata, read one column in one row-group.
 
     Parameters
@@ -443,10 +452,20 @@ def read_col(column, schema_helper, infile, use_cat=False,
     use_cat: bool (False)
         If this column is encoded throughout with dict encoding, give back
         a pandas categorical column; otherwise, decode to values
+    selfmade: bool (False)
+        If data created by fastparquet
+    assign: numpy array
+        Where to store the result
+    catdef: pandas.Categorical or CategoricalDtype
+        If reading a categorical column, the categorical definition (categories and 
+        ordering).
     row_filter: bool array or None
         if given, selects which of the values read are to be written
         into the output. Effectively implies NULLs, even for a required
         column.
+    global_cats: dict or None
+        Optional dictionary for storing global categorical values across row groups.
+        Format: {col_path: array}
     """
     cmd = column.meta_data
     try:
@@ -480,6 +499,15 @@ def read_col(column, schema_helper, infile, use_cat=False,
     row_idx = [0]  # map/list objects
     dic = None
     index_off = 0  # how far through row_filter we are
+    
+    # Initialize tracking variables for categorical dictionaries
+    # Only set up global dictionary tracking if using categorical and global_cats is provided
+    remap_dict = {}  # Dictionary for collecting mappings
+    if use_cat and global_cats is not None:
+        path_str = ".".join(cmd.path_in_schema)
+        # Register this column in global_cats if not already present
+        if path_str not in global_cats:
+            global_cats[path_str] = None
 
     while num < rows:
         off = infile.tell()
@@ -497,7 +525,44 @@ def read_col(column, schema_helper, infile, use_cat=False,
                 ddt = [kv.value.decode() for kv in (cmd.key_value_metadata or [])
                        if kv.key == b"label_dtype"]
                 ddt = ddt[0] if ddt else None
-                catdef._set_categories(pd.Index(dic, dtype=ddt), fastpath=True)
+
+                if global_cats is not None:
+                    # Check if categorical values are consistent with global dictionary.
+                    if global_cats[path_str] is None:
+                        # This is the first dictionary for this column, save it as global
+                        global_cats[path_str] = dic
+                    else:
+                        # Dictionary already defined for this column, check for inconsistency.
+                        global_dict = global_cats[path_str]
+                        new_values = []
+                        # Build remap_dict in a single comprehension,
+                        # appending new values to new_values at the same time:
+                        # - Use walrus operator (:=) to store found_idx from global_dict lookup.
+                        # - When found_idx is -1, append val to new_values and use its new position.
+                        # - Only include indices that need remapping (found_idx != i).
+                        remap_dict = {i: (len(global_dict) + len(new_values) - 1)
+                                      if found_idx == -1 and not new_values.append(val) else found_idx
+                                      for (i,), val in np.ndenumerate(dic)
+                                      if (found_idx := next((j
+                                          for (j,), gval in np.ndenumerate(global_dict)
+                                          if val == gval), -1)) != i
+                                      }
+                        if remap_dict:
+                            # If any remapping is needed, create a complete remap array.
+                            # Initialize with identity mapping (no change)
+                            remap_array = np.arange(len(dic), dtype=np.int32)
+                            # Update indices that need remapping
+                            remap_array[list(remap_dict)] = list(remap_dict.values())
+                            if new_values:
+                                # Add new values to global dictionary
+                                global_cats[path_str] = np.append(global_dict, new_values)  
+                                # Update categories
+                                catdef._set_categories(pd.Index(global_cats[path_str], dtype=ddt), fastpath=True)
+                    
+                # Normal case - always set categories for this dictionary
+                if global_cats is None or not remap_dict:
+                    catdef._set_categories(pd.Index(dic, dtype=ddt), fastpath=True)
+                
                 if np.iinfo(assign.dtype).max < len(dic):
                     raise RuntimeError('Assigned array dtype (%s) cannot accommodate '
                                        'number of category labels (%i)' %
@@ -509,7 +574,7 @@ def read_col(column, schema_helper, infile, use_cat=False,
         if ph.type == parquet_thrift.PageType.DATA_PAGE_V2:
             num += read_data_page_v2(infile, schema_helper, se, ph.data_page_header_v2, cmd,
                                      dic, assign, num, use_cat, off, ph, row_idx, selfmade=selfmade,
-                                     row_filter=row_filter)
+                                     row_filter=row_filter, remap_array=remap_array if remap_dict else None)
             continue
         if (selfmade and hasattr(cmd, 'statistics') and
                 getattr(cmd.statistics, 'null_count', 1) == 0):
@@ -563,6 +628,9 @@ def read_col(column, schema_helper, infile, use_cat=False,
                 part[defi == max_defi] = dic[val]
             elif not use_cat:
                 part[defi == max_defi] = convert(val, se, dtype=assign.dtype)
+            elif remap_dict:
+                # Apply remapping of categorical codes
+                part[defi == max_defi] = remap_array[val]
             else:
                 part[defi == max_defi] = val
         else:
@@ -582,6 +650,9 @@ def read_col(column, schema_helper, infile, use_cat=False,
                 piece[:] = dic[val]
             elif not use_cat:
                 piece[:] = convert(val, se, dtype=assign.dtype)
+            elif remap_dict:
+                # Apply remapping of categorical codes
+                piece[:] = remap_array[val]
             else:
                 piece[:] = val
 
@@ -589,7 +660,8 @@ def read_col(column, schema_helper, infile, use_cat=False,
 
 
 def read_row_group_arrays(file, rg, columns, categories, schema_helper, cats,
-                          selfmade=False, assign=None, row_filter=False):
+                          selfmade=False, assign=None, row_filter=False,
+                          global_cats=None):
     """
     Read a row group and return as a dict of arrays
 
@@ -615,7 +687,7 @@ def read_row_group_arrays(file, rg, columns, categories, schema_helper, cats,
         read_col(column, schema_helper, file, use_cat=name+'-catdef' in out,
                  selfmade=selfmade, assign=out[name],
                  catdef=out.get(name+'-catdef', None),
-                 row_filter=row_filter)
+                 row_filter=row_filter, global_cats=global_cats)
 
         if _is_map_like(schema_helper, column):
             # TODO: could be done in fast loop in _assemble_objects?
@@ -634,7 +706,8 @@ def read_row_group_arrays(file, rg, columns, categories, schema_helper, cats,
 
 def read_row_group(file, rg, columns, categories, schema_helper, cats,
                    selfmade=False, index=None, assign=None,
-                   scheme='hive', partition_meta=None, row_filter=False):
+                   scheme='hive', partition_meta=None, row_filter=False,
+                   global_cats=None):
     """
     Access row-group in a file and read some columns into a data-frame.
     """
@@ -642,7 +715,8 @@ def read_row_group(file, rg, columns, categories, schema_helper, cats,
     if assign is None:
         raise RuntimeError('Going with pre-allocation!')
     read_row_group_arrays(file, rg, columns, categories, schema_helper,
-                          cats, selfmade, assign=assign, row_filter=row_filter)
+                          cats, selfmade, assign=assign, row_filter=row_filter,
+                          global_cats=global_cats)
 
     for cat in cats:
         if cat not in assign:
