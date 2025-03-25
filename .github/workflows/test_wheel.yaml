@@ -58,7 +58,7 @@ jobs:
           python -m pip install delvewheel cython
 
       - name: Build wheels
-        uses: joerick/cibuildwheel@v2.16.5
+        uses: joerick/cibuildwheel@v2.21.3
 
       - name: Install wheels
         shell: bash -l {0}

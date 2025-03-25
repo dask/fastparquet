@@ -181,7 +181,7 @@ def find_type(data, fixed_text=None, object_encoding=None, times='int64',
                     "LogicalType",
                     TIMESTAMP=ThriftObject.from_fields(
                         "TimestampType",
-                        isAdjustedToUTC=True,
+                        isAdjustedToUTC=tz,
                         unit=ThriftObject.from_fields("TimeUnit", MICROS={})
                     )
                 )
@@ -195,7 +195,7 @@ def find_type(data, fixed_text=None, object_encoding=None, times='int64',
                     "LogicalType",
                     TIMESTAMP=ThriftObject.from_fields(
                         "TimestampType",
-                        isAdjustedToUTC=True,
+                        isAdjustedToUTC=tz,
                         unit=ThriftObject.from_fields("TimeUnit", MILLIS={})
                     )
                 )
@@ -214,7 +214,7 @@ def find_type(data, fixed_text=None, object_encoding=None, times='int64',
     elif dtype.kind == "m":
         type, converted_type, width = (parquet_thrift.Type.INT64,
                                        parquet_thrift.ConvertedType.TIME_MICROS, None)
-    elif "string" in str(dtype):
+    elif "str" in str(dtype):
         type, converted_type, width = (parquet_thrift.Type.BYTE_ARRAY,
                                        parquet_thrift.ConvertedType.UTF8,
                                        None)
@@ -283,7 +283,7 @@ def convert(data, se):
             raise ValueError('Error converting column "%s" to bytes using '
                              'encoding %s. Original error: '
                              '%s' % (data.name, ct, e))
-    elif str(dtype) == "string":
+    elif "str" in str(dtype):
         try:
             if converted_type == parquet_thrift.ConvertedType.UTF8:
                 # TODO: into bytes in one step
@@ -315,10 +315,28 @@ def convert(data, se):
         out['ns'] = ns
         out['day'] = day
     elif dtype.kind == "M":
-        out = data.values.view("int64")
+        part = str(dtype).split("[")[1][:-1].split(",")[0]
+        if converted_type:
+            factor = time_factors[(converted_type, part)]
+        else:
+            unit = [k for k, v in se.logicalType.TIMESTAMP.unit._asdict().items() if v is not None][0]
+            factor = time_factors[(unit, part)]
+        try:
+            out = data.values.view("int64") * factor
+        except KeyError:
+            breakpoint()
     else:
         raise ValueError("Don't know how to convert data type: %s" % dtype)
     return out
+
+
+time_factors = {
+    ("NANOS", "ns"): 1,
+    (parquet_thrift.ConvertedType.TIMESTAMP_MICROS, "us"): 1,
+    (parquet_thrift.ConvertedType.TIMESTAMP_MICROS, "ns"): 1000,
+    (parquet_thrift.ConvertedType.TIMESTAMP_MILLIS, "ms"): 1,
+    (parquet_thrift.ConvertedType.TIMESTAMP_MILLIS, "s"): 1000,
+}
 
 
 def infer_object_encoding(data):
@@ -449,7 +467,7 @@ def _rows_per_page(data, selement, has_nulls=True, page_size=None):
         bytes_per_element = 4
     elif isinstance(data.dtype, BaseMaskedDtype) and data.dtype in pdoptional_to_numpy_typemap:
         bytes_per_element = np.dtype(pdoptional_to_numpy_typemap[data.dtype]).itemsize
-    elif data.dtype == "object" or str(data.dtype) == "string":
+    elif data.dtype == "object" or "str" in str(data.dtype):
         dd = data.iloc[:1000]
         d2 = dd[dd.notnull()]
         try:
@@ -957,11 +975,8 @@ def write_simple(fn, data, fmd, row_group_offsets=None, compression=None,
     if isinstance(data, pd.DataFrame):
         data = iter_dataframe(data, row_group_offsets)
     mode = 'rb+' if append else 'wb'
-    if hasattr(fn, "write"):
-        of = fn
-    else:
-        of = open_with(fn, mode)
-    with of as f:
+
+    def write_to_file(f):
         if append:
             f.seek(-8, 2)
             head_size = struct.unpack('<I', f.read(4))[0]
@@ -980,6 +995,13 @@ def write_simple(fn, data, fmd, row_group_offsets=None, compression=None,
         foot_size = write_thrift(f, fmd)
         f.write(struct.pack(b"<I", foot_size))
         f.write(MARKER)
+
+    if hasattr(fn, "write"):
+        write_to_file(fn)
+    else:
+        of = open_with(fn, mode)
+        with of as f:
+            write_to_file(f)
 
 
 def write_multi(dn, data, fmd, row_group_offsets=None, compression=None,

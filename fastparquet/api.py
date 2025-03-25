@@ -196,6 +196,7 @@ class ParquetFile(object):
                                      "a filesystem compatible with fsspec") from e
         self.open = open_with
         self._statistics = None
+        self.global_cats = {}
 
     def _parse_header(self, f, verify=True):
         if self.fn and self.fn.endswith("_metadata"):
@@ -260,7 +261,7 @@ class ParquetFile(object):
 
     @property
     def statistics(self):
-        if self._statistics is None:
+        if not hasattr(self, '_statistics') or self._statistics is None:
             self._statistics = statistics(self)
         return self._statistics
 
@@ -318,7 +319,8 @@ class ParquetFile(object):
         new_pf.__setstate__(
             {"fn": self.fn, "open": self.open, "fmd": fmd,
              "pandas_nulls": self.pandas_nulls, "_base_dtype": self._base_dtype,
-             "tz": self.tz, "_columns_dtype": self._columns_dtype}
+             "tz": self.tz, "_columns_dtype": self._columns_dtype,
+             "global_cats": {}}  # fresh empty dict for the slice
         )
         new_pf._set_attrs()
         return new_pf
@@ -389,7 +391,7 @@ class ParquetFile(object):
             f, rg, columns, categories, self.schema, self.cats,
             selfmade=self.selfmade, index=index,
             assign=assign, scheme=self.file_scheme, partition_meta=partition_meta,
-            row_filter=row_filter
+            row_filter=row_filter, global_cats=self.global_cats
         )
         if ret:
             return df
@@ -1011,7 +1013,7 @@ selection does not match number of rows in DataFrame.')
             self.fmd.row_groups = []
         return {"fn": self.fn, "open": self.open, "fmd": self.fmd,
                 "pandas_nulls": self.pandas_nulls, "_base_dtype": self._base_dtype,
-                "tz": self.tz}
+                "tz": self.tz, "global_cats": self.global_cats}
 
     def __setstate__(self, state):
         self.__dict__.update(state)

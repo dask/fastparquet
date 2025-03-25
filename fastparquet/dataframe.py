@@ -144,14 +144,19 @@ def empty(types, size, cats=None, cols=None, index_types=None, index_names=None,
             # validation due to being an out-of-bounds datetime. xref
             # https://github.com/dask/fastparquet/issues/778
             dtype = np.dtype(t)
-            d = np.zeros(size, dtype=dtype) if dtype.kind == "M" else np.empty(size, dtype=dtype)
-            if d.dtype.kind == "M" and str(col) in timezones:
+            if dtype.kind == "M":
+                d = np.zeros(size, dtype=dtype)
                 # 1) create the DatetimeIndex in UTC as no datetime conversion is needed and
                 # it works with d uninitialised data (no NonExistentTimeError or AmbiguousTimeError)
                 # 2) convert to timezone (if UTC=noop, if None=remove tz, if other=change tz)
-                index = DatetimeIndex(d, tz="UTC").tz_convert(
-                    tz_to_dt_tz(timezones[str(col)]))
+                if str(col) in timezones:
+                    index = DatetimeIndex(d, tz="UTC").tz_convert(
+                        tz_to_dt_tz(timezones[str(col)]))
+                else:
+                    index = DatetimeIndex(d, tz=None)
+                d = index._data._ndarray
             else:
+                d = np.empty(size, dtype=dtype)
                 index = Index(d)
             views[col] = d
     else:
@@ -238,7 +243,7 @@ def empty(types, size, cats=None, cols=None, index_types=None, index_names=None,
                 views[col] = block.values._codes
                 views[col+'-catdef'] = block.values
             elif getattr(block.dtype, 'tz', None):
-                arr = np.asarray(block.values, dtype='M8[ns]')
+                arr = block.values._ndarray
                 if len(arr.shape) > 1:
                     # pandas >= 1.3 does this for some reason
                     arr = arr.squeeze(axis=0)

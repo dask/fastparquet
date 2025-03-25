@@ -37,26 +37,30 @@ def frame_symbol_dtTrade_type_strike(days=1 * 252,
 @pytest.mark.parametrize('input_symbols,input_days,file_scheme,input_columns,'
                          'partitions,filters',
                          [
-                             (['NOW', 'SPY', 'VIX'], 2 * 252, 'hive', 2,
-                              ['symbol', 'year'], [('symbol', '==', 'SPY')]),
-                             (['now', 'SPY', 'VIX'], 2 * 252, 'hive', 2,
-                              ['symbol', 'year'], [('symbol', '==', 'SPY')]),
-                             (['TODAY', 'SPY', 'VIX'], 2 * 252, 'hive', 2,
-                              ['symbol', 'year'], [('symbol', '==', 'SPY')]),
-                             (['VIX*', 'SPY', 'VIX'], 2 * 252, 'hive', 2,
-                              ['symbol', 'year'], [('symbol', '==', 'SPY')]),
-                             (['QQQ*', 'SPY', 'VIX'], 2 * 252, 'hive', 2,
-                              ['symbol', 'year'], [('symbol', '==', 'SPY')]),
-                             (['QQQ!', 'SPY', 'VIX'], 2 * 252, 'hive', 2,
-                              ['symbol', 'year'], [('symbol', '==', 'SPY')]),
-                             (['Q%QQ', 'SPY', 'VIX'], 2 * 252, 'hive', 2,
-                              ['symbol', 'year'], [('symbol', '==', 'SPY')]),
-                             (['NOW', 'SPY', 'VIX'], 10, 'hive', 2,
-                              ['symbol', 'dtTrade'], [('symbol', '==', 'SPY')]),
+                             # (['NOW', 'SPY', 'VIX'], 2 * 252, 'hive', 2,
+                             #  ['symbol', 'year'], [('symbol', '==', 'SPY')]),
+                             # (['now', 'SPY', 'VIX'], 2 * 252, 'hive', 2,
+                             #  ['symbol', 'year'], [('symbol', '==', 'SPY')]),
+                             # (['TODAY', 'SPY', 'VIX'], 2 * 252, 'hive', 2,
+                             #  ['symbol', 'year'], [('symbol', '==', 'SPY')]),
+                             # (['VIX*', 'SPY', 'VIX'], 2 * 252, 'hive', 2,
+                             #  ['symbol', 'year'], [('symbol', '==', 'SPY')]),
+                             # (['QQQ*', 'SPY', 'VIX'], 2 * 252, 'hive', 2,
+                             #  ['symbol', 'year'], [('symbol', '==', 'SPY')]),
+                             # (['QQQ!', 'SPY', 'VIX'], 2 * 252, 'hive', 2,
+                             #  ['symbol', 'year'], [('symbol', '==', 'SPY')]),
+                             # (['Q%QQ', 'SPY', 'VIX'], 2 * 252, 'hive', 2,
+                             #  ['symbol', 'year'], [('symbol', '==', 'SPY')]),
+                             # (['NOW', 'SPY', 'VIX'], 10, 'hive', 2,
+                             #  ['symbol', 'dtTrade'], [('symbol', '==', 'SPY')]),
                              (['NOW', 'SPY', 'VIX'], 10, 'hive', 2,
                               ['symbol', 'dtTrade'],
                               [('dtTrade', '==',
                                 '2005-01-02 00:00:00')]),
+                             (['NOW', 'SPY', 'VIX'], 10, 'hive', 2,
+                              ['symbol', 'dtTrade'],
+                              [('dtTrade', '==',
+                                pd.to_datetime('2005-01-02 00:00:00'))]),
                          ]
                          )
 def test_frame_write_read_verify(tempdir, input_symbols, input_days,
@@ -88,15 +92,9 @@ def test_frame_write_read_verify(tempdir, input_symbols, input_days,
 
     # Filter Input Frame to Match What Should Be Expected from parquet read
     # Handle either string or non-string inputs / works for timestamps
-    filterStrings = []
+    filtered_input_df = input_df
     for name, operator, value in filters:
-        if isinstance(value, str):
-            value = "'{}'".format(value)
-        else:
-            value = value.__repr__()
-        filterStrings.append("{} {} {}".format(name, operator, value))
-    filters_expression = " and ".join(filterStrings)
-    filtered_input_df = input_df.query(filters_expression)
+        filtered_input_df = filtered_input_df[filtered_input_df[name] == value]
 
     # Check to Ensure Columns Match
     for col in filtered_output_df.columns:

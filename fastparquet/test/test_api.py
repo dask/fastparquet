@@ -44,14 +44,23 @@ def test_statistics(tempdir):
     p = ParquetFile(fn)
 
     s = statistics(p)
-    expected = {'distinct_count': {'x': [None, None],
+    expected1 = {'distinct_count': {'x': [None, None],
                                    'y': [None, None],
                                    'z': [None, None]},
                 'max': {'x': [2, 3], 'y': [2.0, 1.0], 'z': ['b', 'c']},
                 'min': {'x': [1, 3], 'y': [1.0, 1.0], 'z': ['a', 'c']},
                 'null_count': {'x': [0, 0], 'y': [0, 0], 'z': [0, 0]}}
 
-    assert s == expected
+    assert s == expected1
+
+    expected2 = {'distinct_count': {'x': [None],
+                                   'y': [None],
+                                   'z': [None]},
+                'max': {'x': [3], 'y': [1.0], 'z': ['c']},
+                'min': {'x': [3], 'y': [1.0], 'z': ['c']},
+                'null_count': {'x': [0], 'y': [0], 'z': [0]}}
+
+    assert p[-1].statistics == expected2
 
 
 def test_logical_types(tempdir):
@@ -1546,3 +1555,39 @@ def test_read_a_non_pandas_parquet_file(tempdir):
 
     assert parquet_file.count() == 2
     assert parquet_file.head(1).equals(pd.DataFrame({"foo": [0], "bar": ["a"]}))
+
+
+def test_gh929(tempdir):
+    idx = pd.date_range("2024-01-01", periods=4, freq="h", tz="Europe/Brussels")
+    df = pd.DataFrame(index=idx, data={"index_as_col": idx})
+
+    df.to_parquet(f"{tempdir}/test_datetimetz_index.parquet", engine="fastparquet")
+    result = pd.read_parquet(f"{tempdir}/test_datetimetz_index.parquet", engine="fastparquet")
+    assert result.index.equals(df.index)
+
+
+def test_writing_to_buffer_does_not_close():
+    df = pd.DataFrame({"val": [1, 2]})
+    buffer = io.BytesIO()
+    write(buffer, df, file_scheme="simple")
+    assert not buffer.closed
+    parquet_file = ParquetFile(buffer)
+    assert parquet_file.count() == 2
+
+
+@pytest.fixture()
+def pandas_string():
+    if pd.__version__.split(".") < ["3"]:
+        pytest.skip("'string' type coming in pandas 3.0.0")
+    original = pd.options.future.infer_string
+    pd.options.future.infer_string = True
+    yield
+    pd.options.future.infer_string = original
+
+
+def test_auto_string(tempdir, pandas_string):
+    fn = f"{tempdir}/test.parquet"
+    df = pd.DataFrame({"a": ["some", "strings"]})
+    df.to_parquet(fn, engine="fastparquet")
+
+

@@ -23,8 +23,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Fetch upstream tags
+        run: |
+          git remote add upstream https://github.com/dask/fastparquet.git
+          git fetch upstream --tags
+
       - name: Setup conda
-        uses: mamba-org/provision-with-micromamba@main
+        uses: conda-incubator/setup-miniconda@v3
         with:
           environment-file: ci/environment-${{ matrix.CONDA_ENV }}.yml
 
@@ -53,8 +58,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Fetch upstream tags
+        run: |
+          git remote add upstream https://github.com/dask/fastparquet.git
+          git fetch upstream --tags
+
       - name: Setup conda
-        uses: mamba-org/provision-with-micromamba@main
+        uses: conda-incubator/setup-miniconda@v3
         with:
           environment-file: ci/environment-${{ matrix.CONDA_ENV }}.yml
 
@@ -82,8 +92,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Fetch upstream tags
+        run: |
+          git remote add upstream https://github.com/dask/fastparquet.git
+          git fetch upstream --tags
+
       - name: Setup conda
-        uses: mamba-org/provision-with-micromamba@main
+        uses: conda-incubator/setup-miniconda@v3
         with:
           environment-file: ci/environment-py310.yml
 
@@ -94,6 +109,7 @@ jobs:
           pip install hypothesis
           pip install pytest-localserver pytest-xdist pytest-asyncio
           pip install -e . --no-deps # Install fastparquet
+          pip install versioneer # Needed for pandas build
           git clone https://github.com/pandas-dev/pandas
           cd pandas
           python setup.py build_ext -j 4
@@ -117,8 +133,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Fetch upstream tags
+        run: |
+          git remote add upstream https://github.com/dask/fastparquet.git
+          git fetch upstream --tags
+
       - name: Setup conda
-        uses: mamba-org/provision-with-micromamba@main
+        uses: conda-incubator/setup-miniconda@v3
         with:
           environment-file: ci/environment-py310win.yml
 

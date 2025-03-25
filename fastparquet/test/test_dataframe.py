@@ -66,8 +66,8 @@ def np_empty_mock(shape, dtype):
 def test_empty_tz_nonutc():
     df, views = empty(types=[DatetimeTZDtype(unit="ns", tz="CET")], size=8784, cols=['a'],
                       timezones={'a': 'CET', 'index': 'CET'}, index_types=["datetime64[ns]"], index_names=["index"])
-    assert df.index.tz.zone == "CET"
-    assert df.a.dtype.tz.zone == "CET"
+    assert str(df.index.tz) == "CET"
+    assert str(df.a.dtype.tz) == "CET"
 
 
 # non-regression test for https://github.com/dask/fastparquet/issues/778
@@ -91,18 +91,18 @@ def test_timestamps():
     views['t'].dtype.kind == "M"
 
     df, views = empty('M8', 100, cols=['t'], timezones={'t': z})
-    assert df.t.dt.tz.zone == z
+    assert str(df.t.dt.tz) == z
     views['t'].dtype.kind == "M"
 
     # one time column, one normal
     df, views = empty('M8,i', 100, cols=['t', 'i'], timezones={'t': z})
-    assert df.t.dt.tz.zone == z
+    assert str(df.t.dt.tz) == z
     views['t'].dtype.kind == "M"
     views['i'].dtype.kind == 'i'
 
     # no effect of timezones= on non-time column
     df, views = empty('M8,i', 100, cols=['t', 'i'], timezones={'t': z, 'i': z})
-    assert df.t.dt.tz.zone == z
+    assert str(df.t.dt.tz) == z
     assert df.i.dtype.kind == 'i'
     views['t'].dtype.kind == "M"
     views['i'].dtype.kind == 'i'
@@ -111,22 +111,22 @@ def test_timestamps():
     z2 = 'US/Central'
     df, views = empty('M8,M8', 100, cols=['t1', 't2'], timezones={'t1': z,
                                                                   't2': z})
-    assert df.t1.dt.tz.zone == z
-    assert df.t2.dt.tz.zone == z
+    assert str(df.t1.dt.tz) == z
+    assert str(df.t2.dt.tz) == z
 
     df, views = empty('M8,M8', 100, cols=['t1', 't2'], timezones={'t1': z})
-    assert df.t1.dt.tz.zone == z
+    assert str(df.t1.dt.tz) == z
     assert df.t2.dt.tz is None
 
     df, views = empty('M8,M8', 100, cols=['t1', 't2'], timezones={'t1': z,
                                                                   't2': 'UTC'})
-    assert df.t1.dt.tz.zone == z
+    assert str(df.t1.dt.tz) == z
     assert str(df.t2.dt.tz) == 'UTC'
 
     df, views = empty('M8,M8', 100, cols=['t1', 't2'], timezones={'t1': z,
                                                                   't2': z2})
-    assert df.t1.dt.tz.zone == z
-    assert df.t2.dt.tz.zone == z2
+    assert str(df.t1.dt.tz) == z
+    assert str(df.t2.dt.tz) == z2
 
 
 def test_pandas_hive_serialization(tmpdir):

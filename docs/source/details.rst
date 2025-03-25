@@ -194,7 +194,7 @@ split data data on the values of those columns. This is done by writing a
 directory structure with *key=value* names. Multiple partition columns can
 be chosen, leading to a multi-level directory tree.
 
-Consider the following directory tree from this `Spark example <http://Spark.apache.org/docs/latest/sql-programming-guide.html#partition-discovery>`_:
+Consider the following directory tree from this `Spark example <https://spark.apache.org/docs/latest/sql-data-sources-parquet.html#partition-discovery>`_:
 
     table/
         gender=male/
