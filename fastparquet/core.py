@@ -521,9 +521,6 @@ def read_col(column, schema_helper, infile, use_cat=False,
         max_defi = schema_helper.max_definition_level(cmd.path_in_schema)
         if isinstance(row_filter, np.ndarray):
             io = index_off + len(val)  # will be new index_off
-            if row_filter[index_off:index_off+len(val)].sum() == 0:
-                num += len(defi) if defi is not None else len(val)
-                continue
             if defi is not None:
                 val = val[row_filter[index_off:index_off+len(defi)][defi == max_defi]]
                 defi = defi[row_filter[index_off:index_off+len(defi)]]
