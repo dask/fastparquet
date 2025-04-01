@@ -224,13 +224,6 @@ def read_data_page_v2(infile, schema_helper, se, data_header2, cmd,
     b is delta encoded; c is dict encoded
 
     """
-    if data_header2.encoding not in [parquet_thrift.Encoding.PLAIN_DICTIONARY,
-                                     parquet_thrift.Encoding.RLE_DICTIONARY,
-                                     parquet_thrift.Encoding.RLE,
-                                     parquet_thrift.Encoding.PLAIN,
-                                     parquet_thrift.Encoding.DELTA_BINARY_PACKED
-                                     ]:
-        raise NotImplementedError
     size = (ph.compressed_page_size - data_header2.repetition_levels_byte_length -
             data_header2.definition_levels_byte_length)
     data = infile.tell() + data_header2.definition_levels_byte_length + data_header2.repetition_levels_byte_length
@@ -252,11 +245,8 @@ def read_data_page_v2(infile, schema_helper, se, data_header2, cmd,
         bit_width = encoding.width_from_max_int(max_def)
         # not the same as read_data(), because we know the length
         io_obj = encoding.NumpyIO(infile.read(data_header2.definition_levels_byte_length))
-        if nullable:
-            defi = assign._mask
-        else:
-            # TODO: in tabular data, nulls arrays could be reused for each column
-            defi = np.empty(data_header2.num_values, dtype=np.uint8)
+        defi = np.empty(data_header2.num_values, dtype=np.uint8)
+
         encoding.read_rle_bit_packed_hybrid(io_obj, bit_width, data_header2.num_values,
                                             encoding.NumpyIO(defi), itemsize=1)
         if max_rep:
@@ -265,41 +255,21 @@ def read_data_page_v2(infile, schema_helper, se, data_header2, cmd,
         else:
             np.not_equal(defi.view("uint8"), max_def, out=defi)
             nulls = defi.view(np.bool_)
+        if nullable:
+            assign._mask[:] = nulls[row_filter]
     infile.seek(data)
 
-    # input and output element sizes match
-    see = se.type_length == assign.dtype.itemsize * 8 or simple.get(se.type).itemsize == assign.dtype.itemsize
-    # can read-into
-    into0 = ((use_cat or converts_inplace(se) and see)
-             and data_header2.num_nulls == 0
-             and max_rep == 0 and assign.dtype.kind != "O" and row_filter is None
-             and assign.dtype.kind not in "Mm")  # TODO: this can be done in place but is complex
     if row_filter is None:
         row_filter = Ellipsis
     # can decompress-into
     if data_header2.is_compressed is None:
         data_header2.is_compressed = True
-    into = (data_header2.is_compressed and rev_map[cmd.codec] in decom_into
-            and into0)
     if nullable:
         assign = assign._data
 
     uncompressed_page_size = (ph.uncompressed_page_size - data_header2.definition_levels_byte_length -
                               data_header2.repetition_levels_byte_length)
-    if into0 and data_header2.encoding == parquet_thrift.Encoding.PLAIN and (
-            not data_header2.is_compressed or cmd.codec == parquet_thrift.CompressionCodec.UNCOMPRESSED
-    ):
-        # PLAIN read directly into output (a copy for remote files)
-        assign[num:num+n_values].view('uint8')[:] = infile.read(size)
-        convert(assign[num:num+n_values], se)
-    elif into and data_header2.encoding == parquet_thrift.Encoding.PLAIN:
-        # PLAIN decompress directly into output
-        decomp = decom_into[rev_map[cmd.codec]]
-        decomp(np.frombuffer(infile.read(size), dtype="uint8"),
-               assign[num:num+data_header2.num_values].view('uint8'))
-        convert(assign[num:num+n_values], se)
-    elif data_header2.encoding == parquet_thrift.Encoding.PLAIN:
-        # PLAIN, but with nulls or not in-place conversion
+    if data_header2.encoding == parquet_thrift.Encoding.PLAIN:
         codec = cmd.codec if data_header2.is_compressed else "UNCOMPRESSED"
         raw_bytes = decompress_data(np.frombuffer(infile.read(size), "uint8"),
                                     uncompressed_page_size, codec)
@@ -310,7 +280,7 @@ def read_data_page_v2(infile, schema_helper, se, data_header2, cmd,
                             utf=se.converted_type == 0)
         if data_header2.num_nulls:
             if nullable:
-                assign[num:num+data_header2.num_values][~nulls[row_filter]] = convert(values, se)[row_filter]
+                assign[num:num+data_header2.num_values][~nulls[row_filter]] = convert(values, se)[row_filter[~nulls]]
             else:
                 assign[num:num+data_header2.num_values][nulls[row_filter]] = None  # or nan or nat
                 if row_filter is Ellipsis:
@@ -323,7 +293,6 @@ def read_data_page_v2(infile, schema_helper, se, data_header2, cmd,
         parquet_thrift.Encoding.PLAIN_DICTIONARY,
         parquet_thrift.Encoding.RLE_DICTIONARY,
     ]) or (data_header2.encoding == parquet_thrift.Encoding.RLE):
-        # DICTIONARY or BOOL direct decode RLE into output (no nulls)
         codec = cmd.codec if data_header2.is_compressed else "UNCOMPRESSED"
         raw_bytes = np.frombuffer(infile.read(size), dtype='uint8')
         raw_bytes = decompress_data(raw_bytes, uncompressed_page_size, codec)
@@ -331,45 +300,33 @@ def read_data_page_v2(infile, schema_helper, se, data_header2, cmd,
         if data_header2.encoding != parquet_thrift.Encoding.RLE:
             # TODO: check this bit; is the varint read only row byte-exact fastpath?
             bit_width = pagefile.read_byte()
-            encoding.read_unsigned_var_int(pagefile)
+            #encoding.read_unsigned_var_int(pagefile)
         else:
             bit_width = 1
             pagefile.seek(4, 1)
-        if bit_width in [8, 16, 32] and selfmade:
-            # special fastpath for cats
-            outbytes = raw_bytes[pagefile.tell():]
-            if len(outbytes) == assign[num:num+data_header2.num_values].nbytes:
-                assign[num:num+data_header2.num_values].view('uint8')[row_filter] = outbytes[row_filter]
-            else:
-                if data_header2.num_nulls == 0:
-                    assign[num:num+data_header2.num_values][row_filter] = outbytes[row_filter]
-                else:
-                    if row_filter is Ellipsis:
-                        assign[num:num+data_header2.num_values][~nulls] = outbytes
-                    else:
-                        assign[num:num + data_header2.num_values][~nulls[row_filter]] = outbytes[~nulls * row_filter]
-                    assign[num:num+data_header2.num_values][nulls[row_filter]] = -1
+        if data_header2.num_nulls == 0:
+            encoding.read_rle_bit_packed_hybrid(
+                pagefile,
+                bit_width,
+                uncompressed_page_size,
+                encoding.NumpyIO(assign[num:num+data_header2.num_values].view('uint8')),
+                itemsize=bit_width // 8
+            )
         else:
-            if data_header2.num_nulls == 0:
-                encoding.read_rle_bit_packed_hybrid(
-                    pagefile,
-                    bit_width,
-                    uncompressed_page_size,
-                    encoding.NumpyIO(assign[num:num+data_header2.num_values].view('uint8')),
-                    itemsize=bit_width
-                )
-            else:
-                temp = np.empty(data_header2.num_values, assign.dtype)
-                encoding.read_rle_bit_packed_hybrid(
-                    pagefile,
-                    bit_width,
-                    uncompressed_page_size,
-                    encoding.NumpyIO(temp.view('uint8')),
-                    itemsize=bit_width
-                )
-                if not nullable:
-                    assign[num:num+data_header2.num_values][nulls[row_filter]] = None
-                assign[num:num+data_header2.num_values][~nulls[row_filter]] = temp[row_filter]
+            temp = np.empty(data_header2.num_values - data_header2.num_nulls, assign.dtype)
+            encoding.read_rle_bit_packed_hybrid(
+                pagefile,
+                bit_width,
+                uncompressed_page_size,
+                encoding.NumpyIO(temp.view('uint8')),
+                itemsize=bit_width // 8
+            )
+            if not nullable:
+                part = assign[num:num+data_header2.num_values][nulls[row_filter]]
+                if len(part) and not use_cat:
+                    # categories already have -1 everywhere
+                    part[:] = None
+            assign[num:num+data_header2.num_values][~nulls[row_filter]] = temp[row_filter[~nulls]]
 
     elif data_header2.encoding in [
         parquet_thrift.Encoding.PLAIN_DICTIONARY,
@@ -403,7 +360,7 @@ def read_data_page_v2(infile, schema_helper, se, data_header2, cmd,
         else:
             assign[num:num+data_header2.num_values][row_filter] = dic[out][row_filter]
     elif data_header2.encoding == parquet_thrift.Encoding.DELTA_BINARY_PACKED:
-        assert data_header2.num_nulls == 0, "null delta-int not implemented"
+        assert data_header2.num_nulls == 0, "nullable delta-int not implemented"
         codec = cmd.codec if data_header2.is_compressed else "UNCOMPRESSED"
         raw_bytes = decompress_data(np.frombuffer(infile.read(size), "uint8"),
                                     uncompressed_page_size, codec)
@@ -420,9 +377,6 @@ def read_data_page_v2(infile, schema_helper, se, data_header2, cmd,
             )
             assign[num:num+data_header2.num_values][row_filter] = convert(out, se)[row_filter]
     else:
-        # codec = cmd.codec if data_header2.is_compressed else "UNCOMPRESSED"
-        # raw_bytes = decompress_data(infile.read(size),
-        #                             ph.uncompressed_page_size, codec)
         raise NotImplementedError
     return data_header2.num_values
 
