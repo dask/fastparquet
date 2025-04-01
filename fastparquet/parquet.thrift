@@ -1,4 +1,3 @@
-df_filtered = pf.to_pandas(filters=[('filter_col', '>', 6)], row_filter=True)v2/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -11,7 +10,7 @@ df_filtered = pf.to_pandas(filters=[('filter_col', '>', 6)], row_filter=True)v2/
  *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANYdf_filtered = pf.to_pandas(filters=[('filter_col', '>', 6)], row_filter=True)
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
  * under the License.
