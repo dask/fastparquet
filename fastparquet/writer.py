@@ -321,10 +321,7 @@ def convert(data, se):
         else:
             unit = [k for k, v in se.logicalType.TIMESTAMP.unit._asdict().items() if v is not None][0]
             factor = time_factors[(unit, part)]
-        try:
-            out = data.values.view("int64") * factor
-        except KeyError:
-            breakpoint()
+        out = data.values.view("int64") // factor
     else:
         raise ValueError("Don't know how to convert data type: %s" % dtype)
     return out
