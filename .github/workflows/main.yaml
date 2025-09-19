@@ -107,6 +107,7 @@ jobs:
         with:
           repository: pandas-dev/pandas
           path: pandas
+          fetch-depth: 0 # fetch all history for correct version
 
       - name: Install fastparquet and pandas
         shell: bash -l {0}
