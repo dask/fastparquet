@@ -6,3 +6,6 @@ build-backend = "setuptools.build_meta"
 write_to = "fastparquet/_version.py"
 version_scheme = "guess-next-dev"
 local_scheme = "no-local-version"
+
+[tool.pytest.ini_options]
+addopts = "-vv"
