@@ -581,7 +581,7 @@ def test_sparse_column_multiindex_no_row_index(tempdir):
     df.columns = cmidx
     writer.write(tempdir, df, file_scheme='hive')
     out = fastparquet.ParquetFile(tempdir).to_pandas()
-    assert pd.testing.assert_frame_equal(df, out)
+    pd.testing.assert_frame_equal(df, out)
 
 
 def test_single_delta_value():
