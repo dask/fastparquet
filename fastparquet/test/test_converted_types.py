@@ -7,9 +7,11 @@ import zoneinfo
 import numpy as np
 import pandas as pd
 import pytest
+from packaging.version import Version
 
 from fastparquet import parquet_thrift as pt
 from fastparquet.converted_types import convert
+from fastparquet.util import PANDAS_VERSION
 
 
 def test_int32():
@@ -62,6 +64,12 @@ def test_timestamp_millis():
                 dtype='datetime64[ns]'))
 
 
+@pytest.mark.xfail(
+                PANDAS_VERSION >= Version("3.dev"),
+                reason=("Need to add pandas v3 support: "
+                        "pandas tries to decode `data`, resulting in "
+                        "AttributeError: 'str' object has no attribute 'decode'")
+            )
 def test_utf8():
     """Test bytes representing utf-8 string."""
     schema = pt.SchemaElement(

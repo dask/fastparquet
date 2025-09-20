@@ -4,10 +4,12 @@ from unittest import mock
 import numpy as np
 import pandas as pd
 import pytest
+from packaging.version import Version
 from numpy import empty as np_empty
 from pandas.testing import assert_frame_equal
 
 from fastparquet.dataframe import empty
+from fastparquet.util import PANDAS_VERSION
 
 DatetimeTZDtype = pd.DatetimeTZDtype
 
@@ -129,6 +131,11 @@ def test_timestamps():
     assert str(df.t2.dt.tz) == z2
 
 
+@pytest.mark.xfail(
+                PANDAS_VERSION >= Version("3.dev"),
+                reason=("Need to add pandas v3 support: "
+                        "Add support to pd.StringDtype()")
+            )
 def test_pandas_hive_serialization(tmpdir):
     parquet_dir = tmpdir.join("test.par")
     column = "data"
