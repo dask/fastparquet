@@ -27,7 +27,6 @@ TEST_DATA = "test-data"
 WIN = os.name == 'nt'
 
 
-@pytest.mark.xfail(reason="new numpy")
 def test_import_without_warning():
     # in a subprocess to avoid import chacing issues.
     subprocess.check_call([sys.executable, "-Werror", "-c", "import fastparquet"])
