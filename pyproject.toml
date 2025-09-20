@@ -9,3 +9,4 @@ local_scheme = "no-local-version"
 
 [tool.pytest.ini_options]
 addopts = "-vv"
+xfail_strict = true
