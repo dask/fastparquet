@@ -99,6 +99,11 @@ Index
 1. :ref:`search`
 
 
+These docs pages collect anonymous tracking data using goatcounter, and the
+dashboard is available to the public: https://fastparquet.goatcounter.com/ .
+
+
+
 .. raw:: html
 
     <script data-goatcounter="https://fastparquet.goatcounter.com/count"
