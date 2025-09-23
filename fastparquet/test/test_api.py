@@ -1054,7 +1054,7 @@ def test_multi_dtype(tempdir):
 
     pf = fastparquet.ParquetFile(fn)
     df2 = pf.to_pandas()
-    pd.testing.assert_frame_equal(df, df2)
+    assert df.equals(df2)
 
 
 def test_simple_nested():
@@ -1235,8 +1235,7 @@ def test_remove_rgs_no_partition(tempdir):
                           index=[pd.Timestamp('2020/01/02 01:59:00'),
                                  pd.Timestamp('2020/01/02 03:59:00')])
     df_ref.index.name = 'index'
-    result = pf.to_pandas()
-    pd.testing.assert_frame_equal(result, df_ref)
+    assert pf.to_pandas().equals(df_ref)
 
 
 @pytest.mark.xfail(
@@ -1264,8 +1263,7 @@ def test_remove_rgs_with_partitions(tempdir):
     df_ref.index.name = 'index'
     df_ref['country'] = df_ref['country'].astype('category') 
     df_ref['city'] = df_ref['city'].astype('category') 
-    result = pf.to_pandas()
-    pd.testing.assert_frame_equal(result, df_ref)
+    assert pf.to_pandas().equals(df_ref)
 
 
 @pytest.mark.xfail(
@@ -1295,8 +1293,7 @@ def test_remove_rgs_partitions_and_fsspec(tempdir):
     df_ref.index.name = 'index'
     df_ref['country'] = df_ref['country'].astype('category') 
     df_ref['city'] = df_ref['city'].astype('category') 
-    result = pf.to_pandas()
-    pd.testing.assert_frame_equal(result, df_ref)
+    assert pf.to_pandas().equals(df_ref) 
 
 
 def test_remove_rgs_not_hive(tempdir):
@@ -1360,7 +1357,7 @@ def test_remove_rgs_simple_merge(tempdir):
     pf.remove_row_groups(files_rgs[file])
     assert len(pf.row_groups) == 2  # check row group list updated (4 initially)    
     df_ref = pd.DataFrame({'a':range(4), 'b':['lo']*2+['hi']*2})
-    pd.testing.assert_frame_equal(pf.to_pandas(), df_ref)
+    assert pf.to_pandas().equals(df_ref) 
 
 
 @pytest.mark.xfail(
@@ -1376,7 +1373,7 @@ def test_write_rgs_simple(tempdir):
     pf.write_row_groups([data_new])
     pf2 = ParquetFile(fn)
     assert pf.fmd == pf2.fmd   # metadata are updated in-place.
-    pd.testing.assert_frame_equal(pf.to_pandas(), df_remove_rgs)
+    assert pf.to_pandas().equals(df_remove_rgs)
 
 
 @pytest.mark.xfail(
@@ -1392,7 +1389,7 @@ def test_write_rgs_simple_no_index(tempdir):
     pf.write_row_groups([df[2:]])
     pf2 = ParquetFile(fn)
     assert pf.fmd == pf2.fmd   # metadata are updated in-place.
-    pd.testing.assert_frame_equal(pf.to_pandas(), df)
+    assert pf.to_pandas().equals(df)
 
 
 @pytest.mark.xfail(
@@ -1409,7 +1406,7 @@ def test_write_rgs_hive(tempdir):
     assert len(pf.row_groups) == 4
     pf2 = ParquetFile(dn)
     assert pf.fmd == pf2.fmd   # metadata are updated in-place.
-    pd.testing.assert_frame_equal(pf.to_pandas(), df_remove_rgs)
+    assert pf.to_pandas().equals(df_remove_rgs)
 
 
 @pytest.mark.xfail(
@@ -1430,7 +1427,7 @@ def test_write_rgs_hive_partitions(tempdir):
     assert pf.fmd == pf2.fmd   # metadata are updated in-place.
     df = df_remove_rgs.sort_index()
     df['country'] = df['country'].astype('category')
-    pd.testing.assert_frame_equal(pf.to_pandas().sort_index(), df)
+    assert pf.to_pandas().sort_index().equals(df)
 
 
 def test_write_rgs_simple_schema_exception(tempdir):
@@ -1478,7 +1475,7 @@ def test_file_renaming_no_partition(tempdir):
                         pd.Timestamp('2020/01/02 02:59:00'),
                         pd.Timestamp('2020/01/02 02:57:00'),
                         pd.Timestamp('2020/01/02 02:58:00')])
-    pd.testing.assert_frame_equal(pf.to_pandas(), expected_df)
+    assert pf.to_pandas().equals(expected_df)
 
 
 @pytest.mark.xfail(
@@ -1514,7 +1511,7 @@ def test_file_renaming_with_partitions(tempdir):
                         pd.Timestamp('2020/01/02 02:58:00')])
     expected_df['city'] = expected_df['city'].astype('category')
     expected_df = expected_df.reindex(columns=pf.to_pandas().columns)
-    pd.testing.assert_frame_equal(pf.to_pandas(), expected_df)
+    assert pf.to_pandas().equals(expected_df)
 
 
 def test_slicing_makes_copy(tempdir):
