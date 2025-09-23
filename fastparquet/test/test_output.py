@@ -935,6 +935,10 @@ def test_bad_object_encoding(tempdir):
     assert "primitive" in str(e.value)
     assert '"a"' in str(e.value)
 
+@pytest.mark.xfail(
+    PANDAS_VERSION >= Version("3.dev"),
+    reason="Need to add pandas v3 support: pyarrow backend string dtype ignores object_encoding",
+)
 def test_object_encoding_int32(tempdir):
     df = pd.DataFrame({'a': ['15', None, '2']})
     fn = os.path.join(tempdir, 'temp.parq')
