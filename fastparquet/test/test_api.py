@@ -1607,6 +1607,11 @@ def test_select_or_iter():
     assert df1["id"].tolist() == dfs[0]["id"].tolist() == list(range(32))
 
 
+@pytest.mark.xfail(
+                PANDAS_VERSION >= Version("3.dev"),
+                reason=("Need to add pandas v3 support: "
+                        "ExtensionArray causes comparison problems on 'bar' series")
+            )
 def test_read_a_non_pandas_parquet_file(tempdir):
     pa = pytest.importorskip("pyarrow")
     pq = pytest.importorskip("pyarrow.parquet")
