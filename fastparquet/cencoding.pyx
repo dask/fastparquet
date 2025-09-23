@@ -13,15 +13,15 @@
 
 import cython
 import numpy as np
-cdef extern from "string.h":
-    void *memcpy(void *dest, const void *src, size_t n)
 from cpython cimport (
     PyBytes_FromStringAndSize, PyBytes_GET_SIZE, PyUnicode_DecodeUTF8,
 )
+from libc.string cimport memcpy
 from libc.stdint cimport int8_t, uint8_t, uint32_t, int32_t, uint64_t, int64_t
+from libc.limits cimport LLONG_MIN
 
 
-cpdef void read_rle(NumpyIO file_obj, int32_t header, int32_t bit_width, NumpyIO o, int32_t itemsize=4):
+cpdef void read_rle(NumpyIO file_obj, int32_t header, int32_t bit_width, NumpyIO o, int32_t itemsize=4) noexcept:
     """Read a run-length encoded run from the given fo with the given header and bit_width.
 
     The count is determined from the header and the width is used to grab the
@@ -52,7 +52,7 @@ cpdef void read_rle(NumpyIO file_obj, int32_t header, int32_t bit_width, NumpyIO
     file_obj.loc += inptr - file_obj.get_pointer()
 
 
-cpdef int32_t width_from_max_int(int64_t value):
+cpdef int32_t width_from_max_int(int64_t value) noexcept:
     """Convert the value specified to a bit_width."""
     cdef int32_t i
     for i in range(0, 64):
@@ -61,12 +61,12 @@ cpdef int32_t width_from_max_int(int64_t value):
         value >>= 1
 
 
-cdef int32_t _mask_for_bits(int32_t i):
+cdef int32_t _mask_for_bits(int32_t i) noexcept:
     """Generate a mask to grab `i` bits from an int value."""
     return (1 << i) - 1
 
 
-cpdef void read_bitpacked1(NumpyIO file_obj, int32_t count, NumpyIO o):
+cpdef void read_bitpacked1(NumpyIO file_obj, int32_t count, NumpyIO o) noexcept:
     # implementation of np.unpackbits with output array. Output is int8 array
     cdef:
         char * inptr = file_obj.get_pointer()
@@ -96,7 +96,7 @@ cpdef void read_bitpacked1(NumpyIO file_obj, int32_t count, NumpyIO o):
     o.loc += count
 
 
-cpdef void write_bitpacked1(NumpyIO file_obj, int32_t count, NumpyIO o):
+cpdef void write_bitpacked1(NumpyIO file_obj, int32_t count, NumpyIO o) noexcept:
     # implementation of np.packbits with output array. Input is int8 array
     cdef char * inptr
     cdef char * outptr
@@ -126,7 +126,7 @@ cpdef void write_bitpacked1(NumpyIO file_obj, int32_t count, NumpyIO o):
     o.loc += (count + 7) // 8
 
 
-cpdef void read_bitpacked(NumpyIO file_obj, int32_t header, int32_t width, NumpyIO o, int32_t itemsize=4):
+cpdef void read_bitpacked(NumpyIO file_obj, int32_t header, int32_t width, NumpyIO o, int32_t itemsize=4) noexcept:
     """
     Read values packed into width-bits each (which can be >8)
     """
@@ -169,7 +169,7 @@ cpdef void read_bitpacked(NumpyIO file_obj, int32_t header, int32_t width, Numpy
     file_obj.loc += inptr - file_obj.get_pointer()
 
 
-cpdef uint64_t read_unsigned_var_int(NumpyIO file_obj):
+cpdef uint64_t read_unsigned_var_int(NumpyIO file_obj) noexcept:
     """Read a value using the unsigned, variable int encoding.
     file-obj is a NumpyIO of bytes; avoids struct to allow numba-jit
     """
@@ -190,7 +190,7 @@ cpdef uint64_t read_unsigned_var_int(NumpyIO file_obj):
 
 
 cpdef void read_rle_bit_packed_hybrid(NumpyIO io_obj, int32_t width, uint32_t length, NumpyIO o,
-                                      int32_t itemsize=4):
+                                      int32_t itemsize=4) noexcept:
     """Read values from `io_obj` using the rel/bit-packed hybrid encoding.
 
     If length is not specified, then a 32-bit int is read first to grab the
@@ -214,12 +214,12 @@ cpdef void read_rle_bit_packed_hybrid(NumpyIO io_obj, int32_t width, uint32_t le
 
 
 cdef void delta_read_bitpacked(NumpyIO file_obj, uint8_t bitwidth,
-                               NumpyIO o, uint64_t count, uint8_t longval=0):
+                               NumpyIO o, uint64_t count, uint8_t longval=0) noexcept:
     cdef:
         uint64_t data = 0
         int8_t left = 0
         int8_t right = 0
-        uint64_t mask = 0XFFFFFFFFFFFFFFFF >> (64 - bitwidth)
+        uint64_t mask = 0XFFFFFFFFFFFFFFFFLL >> (64 - bitwidth)
     while count > 0:
         if (left - right) < bitwidth:
             data = data | (<uint64_t>file_obj.read_byte() << left)
@@ -237,7 +237,7 @@ cdef void delta_read_bitpacked(NumpyIO file_obj, uint8_t bitwidth,
             count -= 1
 
 
-cpdef void delta_binary_unpack(NumpyIO file_obj, NumpyIO o, uint8_t longval=0):
+cpdef int delta_binary_unpack(NumpyIO file_obj, NumpyIO o, uint8_t longval=0):
     cdef:
         uint64_t block_size = read_unsigned_var_int(file_obj)
         uint64_t miniblock_per_block = read_unsigned_var_int(file_obj)
@@ -270,7 +270,7 @@ cpdef void delta_binary_unpack(NumpyIO file_obj, NumpyIO o, uint8_t longval=0):
                     value += min_delta + temp
                     count -= 1
                     if count <= 0:
-                        return
+                        return 0
             else:
                 for j in range(values_per_miniblock):
                     if longval:
@@ -280,17 +280,17 @@ cpdef void delta_binary_unpack(NumpyIO file_obj, NumpyIO o, uint8_t longval=0):
                     value += min_delta
                     count -= 1
                     if count <= 0:
-                        return
+                        return 0
 
 
-cpdef void encode_unsigned_varint(uint64_t x, NumpyIO o):  # pragma: no cover
+cpdef void encode_unsigned_varint(uint64_t x, NumpyIO o) noexcept:  # pragma: no cover
     while x > 127:
         o.write_byte((x & 0x7F) | 0x80)
         x >>= 7
     o.write_byte(x)
 
 
-cpdef encode_bitpacked(int32_t[:] values, int32_t width, NumpyIO o):
+cpdef void encode_bitpacked(int32_t[:] values, int32_t width, NumpyIO o) noexcept:
     """
     Write values packed into width-bits each (which can be >8)
     """
@@ -310,7 +310,7 @@ cpdef encode_bitpacked(int32_t[:] values, int32_t width, NumpyIO o):
         o.write_byte(bits)
 
 
-cpdef void encode_rle_bp(int32_t[:] data, int32_t width, NumpyIO o, int32_t withlength = 0):
+cpdef void encode_rle_bp(int32_t[:] data, int32_t width, NumpyIO o, int32_t withlength = 0) noexcept:
     cdef uint32_t start, end
     if withlength:
         start = o.tell()
@@ -325,7 +325,7 @@ cpdef void encode_rle_bp(int32_t[:] data, int32_t width, NumpyIO o, int32_t with
 
 @cython.freelist(100)
 @cython.final
-cdef class NumpyIO(object):
+cdef class NumpyIO:
     """
     Read or write from a numpy array like a file object
 
@@ -342,7 +342,7 @@ cdef class NumpyIO(object):
         self.ptr = <char*>&data[0]
         self.nbytes = data.shape[0]
 
-    cdef char* get_pointer(self):
+    cdef char* get_pointer(self) noexcept:
         return self.ptr + self.loc
 
     @property
@@ -357,13 +357,13 @@ cdef class NumpyIO(object):
         self.loc += x
         return out
 
-    cpdef uint8_t read_byte(self):
+    cpdef uint8_t read_byte(self) noexcept:
         cdef char out
         out = self.ptr[self.loc]
         self.loc += 1
         return out
 
-    cpdef int32_t read_int(self):
+    cpdef int32_t read_int(self) noexcept:
         cdef int32_t i
         if self.nbytes - self.loc < 4:
             return 0
@@ -371,30 +371,30 @@ cdef class NumpyIO(object):
         self.loc += 4
         return i
 
-    cpdef void write(self, const char[::1] d):
+    cpdef void write(self, const char[::1] d) noexcept:
         memcpy(<void*>self.ptr[self.loc], <void*>&d[0], d.shape[0])
         self.loc += d.shape[0]
 
-    cpdef void write_byte(self, uint8_t b):
+    cpdef void write_byte(self, uint8_t b) noexcept:
         if self.loc >= self.nbytes:
             # ignore attempt to write past end of buffer
             return
         self.ptr[self.loc] = b
         self.loc += 1
 
-    cpdef void write_int(self, int32_t i):
+    cpdef void write_int(self, int32_t i) noexcept:
         if self.nbytes - self.loc < 4:
             return
         (<int32_t*> self.get_pointer())[0] = i
         self.loc += 4
 
-    cdef void write_long(self, int64_t i):
+    cdef void write_long(self, int64_t i) noexcept:
         if self.nbytes - self.loc < 8:
             return
         (<int64_t*> self.get_pointer())[0] = i
         self.loc += 8
 
-    cdef int64_t read_long(self):
+    cdef int64_t read_long(self) noexcept:
         cdef int64_t i
         if self.nbytes - self.loc < 8:
             return 0
@@ -402,15 +402,15 @@ cdef class NumpyIO(object):
         self.loc += 8
         return i
 
-    cdef void write_many(self, char b, int32_t count):
+    cdef void write_many(self, char b, int32_t count) noexcept:
         cdef int32_t i
         for i in range(count):
             self.write_byte(b)
 
-    cpdef int32_t tell(self):
+    cpdef int32_t tell(self) noexcept:
         return self.loc
 
-    cpdef uint32_t seek(self, int32_t loc, int32_t whence=0):
+    cpdef uint32_t seek(self, int32_t loc, int32_t whence=0) noexcept:
         if whence == 0:
             self.loc = loc
         elif whence == 1:
@@ -422,7 +422,7 @@ cdef class NumpyIO(object):
         return self.loc
 
     @cython.wraparound(False)
-    cpdef const uint8_t[:] so_far(self):
+    cpdef const uint8_t[:] so_far(self) noexcept:
         """ In write mode, the data we have gathered until now
         """
         return self.data[:self.loc]
@@ -494,10 +494,10 @@ def _assemble_objects(object[:] assign, const uint8_t[:] defi, const uint8_t[:] 
     return i
 
 
-cdef int64_t nat = -9223372036854775808
+cdef int64_t nat = LLONG_MIN
 
 
-cpdef void time_shift(const int64_t[::1] data, int32_t factor=1000):
+cpdef void time_shift(const int64_t[::1] data, int32_t factor=1000) noexcept:
     cdef int32_t i
     cdef int64_t * ptr
     cdef int64_t value
@@ -508,15 +508,15 @@ cpdef void time_shift(const int64_t[::1] data, int32_t factor=1000):
         ptr += 1
 
 
-cdef int32_t zigzag_int(uint64_t n):
+cdef int32_t zigzag_int(uint64_t n) noexcept:
     return (n >> 1) ^ -(n & 1)
 
 
-cdef int64_t zigzag_long(uint64_t n):
+cdef int64_t zigzag_long(uint64_t n) noexcept:
     return (n >> 1) ^ -(n & 1)
 
 
-cdef uint64_t long_zigzag(int64_t n):
+cdef uint64_t long_zigzag(int64_t n) noexcept:
     return (n << 1) ^ (n >> 63)
 
 
@@ -599,7 +599,7 @@ cdef list read_list(NumpyIO data):
     return out
 
 
-cpdef void write_thrift(dict data, NumpyIO output):
+cpdef int write_thrift(dict data, NumpyIO output):
     cdef int i, l, prev = 0
     cdef int delt = 0
     cdef double d
@@ -662,7 +662,7 @@ cpdef void write_thrift(dict data, NumpyIO output):
     output.write_byte(0)
 
 
-cdef void write_list(list data, NumpyIO output):
+cdef int write_list(list data, NumpyIO output):
     cdef int l = len(data)
     cdef int i
     cdef ThriftObject dd
