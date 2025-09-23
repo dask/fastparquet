@@ -117,7 +117,7 @@ def find_type(data, fixed_text=None, object_encoding=None, times='int64',
     elif "S" in str(dtype)[:2] or "U" in str(dtype)[:2]:
         type, converted_type, width = (parquet_thrift.Type.FIXED_LEN_BYTE_ARRAY,
                                        None, dtype.itemsize)
-    elif dtype == "O" or dtype.kind == "O":
+    elif dtype == "O":
         if object_encoding == 'infer':
             object_encoding = infer_object_encoding(data)
 
