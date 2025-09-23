@@ -18,7 +18,6 @@ from cpython cimport (
 )
 from libc.string cimport memcpy
 from libc.stdint cimport int8_t, uint8_t, uint32_t, int32_t, uint64_t, int64_t
-from libc.limits cimport LLONG_MIN
 
 
 cpdef void read_rle(NumpyIO file_obj, int32_t header, int32_t bit_width, NumpyIO o, int32_t itemsize=4) noexcept:
@@ -219,7 +218,7 @@ cdef void delta_read_bitpacked(NumpyIO file_obj, uint8_t bitwidth,
         uint64_t data = 0
         int8_t left = 0
         int8_t right = 0
-        uint64_t mask = 0XFFFFFFFFFFFFFFFFLL >> (64 - bitwidth)
+        uint64_t mask = 0XFFFFFFFFFFFFFFFF >> (64 - bitwidth)
     while count > 0:
         if (left - right) < bitwidth:
             data = data | (<uint64_t>file_obj.read_byte() << left)
@@ -494,7 +493,7 @@ def _assemble_objects(object[:] assign, const uint8_t[:] defi, const uint8_t[:] 
     return i
 
 
-cdef int64_t nat = LLONG_MIN
+cdef int64_t nat = -9223372036854775808
 
 
 cpdef void time_shift(const int64_t[::1] data, int32_t factor=1000) noexcept:
