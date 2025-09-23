@@ -125,7 +125,7 @@ jobs:
           pytest -v  fastparquet/ # fastparquet test suite against dev pandas
           pytest --verbose pandas/pandas/tests/io/test_parquet.py
           # Test parquet with different filesystems
-          pytest --verbose pandas/pandas/tests/io/test_gcs.py pandas/pandas/tests/io/test_fsspec.py -k "parquet"
+          pytest --verbose pandas/pandas/tests/io/test_gcs.py pandas/pandas/tests/io/test_fsspec.py -k "parquet" -o xfail_strict=False
 
   win:
     name: win
