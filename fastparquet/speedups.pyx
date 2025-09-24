@@ -13,8 +13,7 @@ Native accelerators for Parquet encoding and decoding.
 # cython: cdivision=True
 # cython: always_allow_keywords=False
 
-cdef extern from "string.h":
-    void *memcpy(void *dest, const void *src, size_t n)
+from libc.string cimport memcpy
 
 from cpython cimport (PyUnicode_AsUTF8String, PyUnicode_DecodeUTF8,
                       PyBytes_CheckExact, PyBytes_FromStringAndSize,
