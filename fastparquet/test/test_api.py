@@ -15,13 +15,14 @@ try:
 except ImportError:
     from pandas import Timestamp
 import pytest
+from packaging.version import Version
 
 from .util import tempdir
 import fastparquet
 from fastparquet import write, ParquetFile
 from fastparquet.api import (statistics, sorted_partitioned_columns, filter_in,
                              filter_not_in, row_groups_map)
-from fastparquet.util import join_path
+from fastparquet.util import PANDAS_VERSION, join_path
 
 TEST_DATA = "test-data"
 WIN = os.name == 'nt'
@@ -284,6 +285,11 @@ def test_pathlib_path(tempdir):
     assert out.to_dict() == expected.to_dict()
 
 
+@pytest.mark.xfail(
+                PANDAS_VERSION >= Version("3.dev"),
+                reason=("Need to add pandas v3 support: "
+                        "Add support to pd.StringDtype()")
+            )
 def test_attributes(tempdir):
     df = pd.DataFrame({'x': [1, 2, 3, 4],
                        'y': [1.0, 2.0, 1.0, 2.0],
@@ -1024,6 +1030,11 @@ def test_multi(tempdir):
     assert (df1.loc[1, 'a'].values == df.loc[1, 'a'].values).all()
 
 
+@pytest.mark.xfail(
+                PANDAS_VERSION >= Version("3.dev"),
+                reason=("Need to add pandas v3 support: "
+                        "wrong date caused by either `write` or `to_pandas`")
+            )
 def test_multi_dtype(tempdir):
     # https://github.com/dask/fastparquet/issues/831
     fn = os.path.join(tempdir, 'test.parq')
@@ -1079,6 +1090,10 @@ def test_write_index_false(tempdir):
     assert rec_df.index[0] == 0
 
 
+@pytest.mark.xfail(
+    PANDAS_VERSION >= Version("3.dev"),
+    reason="Need to add pandas v3 support: problem casting ms to s due to overflow",
+)
 def test_timestamp_filer(tempdir):
     fn = os.path.join(tempdir, 'test.parquet')
     ts = [pd.Timestamp('2021/01/01 08:00:00'),
@@ -1197,6 +1212,11 @@ df_remove_rgs = pd.DataFrame({'humidity': [0.3, 0.8, 0.9, 0.7, 0.6],
                                       pd.Timestamp('2020/01/02 02:58:00')])
 
 
+@pytest.mark.xfail(
+                PANDAS_VERSION >= Version("3.dev"),
+                reason=("Need to add pandas v3 support: "
+                        "wrong date caused by either `write` or `to_pandas`")
+            )
 def test_remove_rgs_no_partition(tempdir):
     dn = os.path.join(tempdir, 'test_parquet')
     write(dn, df_remove_rgs, file_scheme='hive', row_group_offsets=[0,2,3])
@@ -1217,6 +1237,11 @@ def test_remove_rgs_no_partition(tempdir):
     assert pf.to_pandas().equals(df_ref)
 
 
+@pytest.mark.xfail(
+                PANDAS_VERSION >= Version("3.dev"),
+                reason=("Need to add pandas v3 support: "
+                        "wrong date caused by either `write` or `to_pandas`")
+            )
 def test_remove_rgs_with_partitions(tempdir):
     dn = os.path.join(tempdir, 'test_parquet')
     write(dn, df_remove_rgs, file_scheme='hive', partition_on=['country', 'city'])
@@ -1240,6 +1265,11 @@ def test_remove_rgs_with_partitions(tempdir):
     assert pf.to_pandas().equals(df_ref)
 
 
+@pytest.mark.xfail(
+                PANDAS_VERSION >= Version("3.dev"),
+                reason=("Need to add pandas v3 support: "
+                        "wrong date caused by either `write` or `to_pandas`")
+            )
 def test_remove_rgs_partitions_and_fsspec(tempdir):
     from fsspec.implementations.local import LocalFileSystem
     dn = os.path.join(tempdir, 'test_parquet')
@@ -1305,6 +1335,11 @@ def test_remove_all_rgs(tempdir):
     assert len(pf.row_groups) == 0 # check row group list updated
 
 
+@pytest.mark.xfail(
+                PANDAS_VERSION >= Version("3.dev"),
+                reason=("Need to add pandas v3 support: "
+                        "Add support to pd.StringDtype()")
+            )
 def test_remove_rgs_simple_merge(tempdir):
     df = pd.DataFrame({'a':range(4), 'b':['lo']*2+['hi']*2})
     fn = os.path.join(tempdir, 'fn1.parquet')
@@ -1324,6 +1359,11 @@ def test_remove_rgs_simple_merge(tempdir):
     assert pf.to_pandas().equals(df_ref) 
 
 
+@pytest.mark.xfail(
+                PANDAS_VERSION >= Version("3.dev"),
+                reason=("Need to add pandas v3 support: "
+                        "wrong date caused by either `write` or `to_pandas`")
+            )
 def test_write_rgs_simple(tempdir):
     fn = os.path.join(tempdir, 'test.parq')
     write(fn, df_remove_rgs[:2], file_scheme='simple')
@@ -1335,6 +1375,11 @@ def test_write_rgs_simple(tempdir):
     assert pf.to_pandas().equals(df_remove_rgs)
 
 
+@pytest.mark.xfail(
+                PANDAS_VERSION >= Version("3.dev"),
+                reason=("Need to add pandas v3 support: "
+                        "Add support to pd.StringDtype()")
+            )
 def test_write_rgs_simple_no_index(tempdir):
     fn = os.path.join(tempdir, 'test.parq')
     df = df_remove_rgs.reset_index(drop=True)
@@ -1346,6 +1391,11 @@ def test_write_rgs_simple_no_index(tempdir):
     assert pf.to_pandas().equals(df)
 
 
+@pytest.mark.xfail(
+                PANDAS_VERSION >= Version("3.dev"),
+                reason=("Need to add pandas v3 support: "
+                        "wrong date caused by either `write` or `to_pandas`")
+            )
 def test_write_rgs_hive(tempdir):
     dn = os.path.join(tempdir, 'test_parq')
     write(dn, df_remove_rgs[:3], file_scheme='hive', row_group_offsets=[0,2])
@@ -1358,6 +1408,11 @@ def test_write_rgs_hive(tempdir):
     assert pf.to_pandas().equals(df_remove_rgs)
 
 
+@pytest.mark.xfail(
+                PANDAS_VERSION >= Version("3.dev"),
+                reason=("Need to add pandas v3 support: "
+                        "wrong date caused by either `write` or `to_pandas`")
+            )
 def test_write_rgs_hive_partitions(tempdir):
     dn = os.path.join(tempdir, 'test_parq')
     write(dn, df_remove_rgs[:3], file_scheme='hive', row_group_offsets=[0,2],
@@ -1388,6 +1443,11 @@ def test_write_rgs_simple_schema_exception(tempdir):
         pf.write_row_groups(data_new)
 
 
+@pytest.mark.xfail(
+                PANDAS_VERSION >= Version("3.dev"),
+                reason=("Need to add pandas v3 support: "
+                        "wrong date caused by either `write` or `to_pandas`")
+            )
 def test_file_renaming_no_partition(tempdir):
     write(tempdir, df_remove_rgs, row_group_offsets=1, file_scheme='hive')
     pf = ParquetFile(tempdir)
@@ -1417,6 +1477,11 @@ def test_file_renaming_no_partition(tempdir):
     assert pf.to_pandas().equals(expected_df)
 
 
+@pytest.mark.xfail(
+                PANDAS_VERSION >= Version("3.dev"),
+                reason=("Need to add pandas v3 support: "
+                        "wrong date caused by either `write` or `to_pandas`")
+            )
 def test_file_renaming_with_partitions(tempdir):
     write(tempdir, df_remove_rgs, row_group_offsets=1, file_scheme='hive',
           partition_on=['city'])
@@ -1541,6 +1606,11 @@ def test_select_or_iter():
     assert df1["id"].tolist() == dfs[0]["id"].tolist() == list(range(32))
 
 
+@pytest.mark.xfail(
+                PANDAS_VERSION >= Version("3.dev"),
+                reason=("Need to add pandas v3 support: "
+                        "ExtensionArray causes comparison problems on 'bar' series")
+            )
 def test_read_a_non_pandas_parquet_file(tempdir):
     pa = pytest.importorskip("pyarrow")
     pq = pytest.importorskip("pyarrow.parquet")

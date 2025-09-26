@@ -80,49 +80,53 @@ jobs:
         run: |
           echo "FASTPARQUET_DATAPAGE_V2=$FASTPARQUET_DATAPAGE_V2"
           pytest --verbose --cov=fastparquet
-#  pandas:
-#    name: pandas
-#    runs-on: ubuntu-latest
-#    steps:
-#      - name: APT
-#        run: sudo apt-get install liblzo2-dev
-#
-#      - name: Checkout
-#        uses: actions/checkout@v2
-#        with:
-#          fetch-depth: 0
-#
-#      - name: Fetch upstream tags
-#        run: |
-#          git remote add upstream https://github.com/dask/fastparquet.git
-#          git fetch upstream --tags
-#
-#      - name: Setup conda
-#        uses: conda-incubator/setup-miniconda@v3
-#        with:
-#          environment-file: ci/environment-py310.yml
-#
-#      - name: pip-install
-#        shell: bash -l {0}
-#        run: |
-#          pip install Cython
-#          pip install hypothesis
-#          pip install pytest-localserver pytest-xdist pytest-asyncio
-#          pip install -e . --no-deps # Install fastparquet
-#          pip install versioneer # Needed for pandas build
-#          git clone https://github.com/pandas-dev/pandas
-#          cd pandas
-#          python setup.py build_ext -j 4
-#          pip install -e . --no-build-isolation
-#
-#      - name: Run Tests
-#        shell: bash -l {0}
-#        run: |
-#          pytest -v  fastparquet/ # fastparquet test suite against dev pandas
-#          pytest --verbose pandas/pandas/tests/io/test_parquet.py
-#          # Test parquet with different filesystems
-#          pytest --verbose pandas/pandas/tests/io/test_gcs.py pandas/pandas/tests/io/test_fsspec.py -k "parquet"
-#
+  pandas:
+    name: pandas
+    runs-on: ubuntu-latest
+    steps:
+      - name: APT
+        run: sudo apt-get install liblzo2-dev
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch upstream tags
+        run: |
+          git remote add upstream https://github.com/dask/fastparquet.git
+          git fetch upstream --tags
+
+      - name: Setup conda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          environment-file: ci/environment-py311.yml
+
+      - name: Fetch pandas
+        uses: actions/checkout@v4
+        with:
+          repository: pandas-dev/pandas
+          path: pandas
+          fetch-depth: 0 # fetch all history for correct version
+
+      - name: Install fastparquet and pandas
+        shell: bash -l {0}
+        run: |
+          pip install Cython
+          pip install hypothesis
+          pip install pytest-localserver pytest-xdist pytest-asyncio
+          pip install meson-python versioneer # Needed for pandas build
+          pip install -e . --no-deps # Install fastparquet
+          pip install -e ./pandas --no-build-isolation -C compile-args="-j4"
+
+      - name: Run Tests
+        shell: bash -l {0}
+        run: |
+          pytest -v  fastparquet/ # fastparquet test suite against dev pandas
+          pytest --verbose pandas/pandas/tests/io/test_parquet.py
+          # Test parquet with different filesystems
+          pytest --verbose pandas/pandas/tests/io/test_gcs.py pandas/pandas/tests/io/test_fsspec.py -k "parquet" -o xfail_strict=False
+
   win:
     name: win
     runs-on: windows-2022

@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy as np
 import os
 
+from packaging.version import Version
 import pandas as pd
 import pytest
 
@@ -377,7 +378,22 @@ def test_multi_index_category(tempdir):
     assert str(dg.c.tolist()) == str(df.c.tolist())  # ignore nan and cats
 
 
-@pytest.mark.parametrize("filename", ["no_columns.parquet", "no_columns_new.parquet"])
+@pytest.mark.parametrize(
+    "filename",
+    [
+        "no_columns.parquet",
+        pytest.param(
+            "no_columns_new.parquet",
+            marks=pytest.mark.xfail(
+                PANDAS_VERSION >= Version("3.dev"),
+                reason=(
+                    "Need to add pandas v3 support: `pf.to_pandas()` "
+                    "inferred_dtype is empty, expected is string"
+                ),
+            ),
+        ),
+    ],
+)
 def test_no_columns(tempdir, filename):
     # https://github.com/dask/fastparquet/issues/361
     # Create a non-empty DataFrame, then select no columns. That way we get
@@ -551,6 +567,10 @@ def test_column_multiindex_roundtrip(tempdir):
     assert df.equals(out)
 
 
+@pytest.mark.xfail(
+    PANDAS_VERSION >= Version("3.dev"),
+    reason="Need to add pandas v3 support: problem casting ms to s due to overflow",
+)
 def test_sparse_column_multiindex_no_row_index(tempdir):
     ts = [pd.Timestamp('2021/01/01 08:00:00'),
           pd.Timestamp('2021/01/05 10:00:00')]
