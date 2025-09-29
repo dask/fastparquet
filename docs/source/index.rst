@@ -93,6 +93,7 @@ Index
     details
     api
     filesystems
+    code-of-conduct
 
 1. :ref:`genindex`
 1. :ref:`modindex`
