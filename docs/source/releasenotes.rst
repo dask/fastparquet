@@ -1,6 +1,9 @@
 Release Notes
 =============
 
+Releases since 2023 are essentially bugfixes only and updating
+supported python versions.
+
 2023.10.0
 ---------
 

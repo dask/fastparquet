@@ -2,7 +2,7 @@ name: test_env
 channels:
   - conda-forge
 dependencies:
-  - python=3.9
+  - python=3.13
   - bson
   - lz4
   - lzo
@@ -13,7 +13,7 @@ dependencies:
   - thrift
   - numpy
   - cramjam
-  - pyspark=3.3
+  - pyspark
   - packaging
   - orjson
   - ujson

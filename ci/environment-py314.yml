@@ -1,0 +1,19 @@
+name: test_env
+channels:
+  - conda-forge
+dependencies:
+  - python=3.14
+  - bson
+  - lz4
+  - lzo
+  - pytest
+  - pandas
+  - dask
+  - pytest-cov
+  - thrift
+  - numpy
+  - cramjam
+  - packaging
+  - orjson
+  - ujson
+  - python-rapidjson
