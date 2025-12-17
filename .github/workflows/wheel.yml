@@ -234,7 +234,7 @@ jobs:
     name: ${{ matrix.os }} ${{ matrix.architecture}}
     env:
       CIBW_BEFORE_ALL: "pip install numpy==2.0.0rc1 cython"
-      CIBW_SKIP: "pp* *37* *38*"
+      CIBW_SKIP: "pp* *37* *38* *39*"
       CIBW_ARCHS_MACOS: ${{ matrix.architecture }}
       CIBW_TEST_SKIP: "*"
 

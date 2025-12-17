@@ -13,7 +13,7 @@ jobs:
         os: [ubuntu-22.04, windows-2022]
         architecture: ['x64']
         linux_archs: ["native"]
-        numpy_version: ["numpy~=1.23", "numpy~=1.24", "numpy~=1.25", "numpy#latest"]
+        numpy_version: ["numpy#latest"]
         include:
           # https://cibuildwheel.readthedocs.io/en/stable/options/#build-skip
           - os: windows-2022
