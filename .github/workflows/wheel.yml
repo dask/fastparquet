@@ -215,9 +215,9 @@ jobs:
             python -m pip install delvewheel cython
 
         - name: Build wheels
-          uses: joerick/cibuildwheel@v2.21.3
+          uses: joerick/cibuildwheel@v3.3.0
 
-        - uses: actions/upload-artifact@v3
+        - uses: actions/upload-artifact@v6
           with:
             path: ./wheelhouse/*.whl
             name: wheels
