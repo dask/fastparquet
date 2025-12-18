@@ -20,7 +20,7 @@ jobs:
     env:
       CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: "delvewheel repair -w {dest_dir} {wheel}"
       CIBW_BEFORE_ALL: "pip install numpy cython"
-      CIBW_SKIP: "pp* *37* *38* *-musllinux_aarch64"
+      CIBW_SKIP: "pp* *38* *-musllinux_aarch64"
       CIBW_ARCHS_LINUX: ${{ matrix.linux_archs }}
       CIBW_TEST_SKIP: "*"
 
@@ -52,10 +52,13 @@ jobs:
       - name: Build wheels
         uses: joerick/cibuildwheel@v3.3.0
 
+      - name: list output
+        run: ls ./wheelhouse/*.whl
+
       - uses: actions/upload-artifact@v6
         with:
           path: ./wheelhouse/*.whl
-          name: wheels
+          name: wheels-${{ matrix.os }}-${{ matrix.architecture}}-${{ matrix.linux_archs}}
 
   buildLinx686:
     if: startsWith(github.ref, 'refs/tags/20') 
@@ -107,10 +110,13 @@ jobs:
       - name: Build wheels
         uses: joerick/cibuildwheel@v3.3.0
 
+      - name: list output
+        run: ls ./wheelhouse/*.whl
+
       - uses: actions/upload-artifact@v6
         with:
           path: ./wheelhouse/*.whl
-          name: wheels
+          name: wheels-${{ matrix.os }}-${{ matrix.architecture}}-${{ matrix.linux_archs }}
 
   buildLinx86x64:
     if: startsWith(github.ref, 'refs/tags/20') 
@@ -162,10 +168,13 @@ jobs:
       - name: Build wheels
         uses: joerick/cibuildwheel@v3.3.0
 
+      - name: list output
+        run: ls ./wheelhouse/*.whl
+
       - uses: actions/upload-artifact@v6
         with:
           path: ./wheelhouse/*.whl
-          name: wheels
+          name: wheels-${{ matrix.os }}-${{ matrix.architecture}}-${{ martix.linux_archs}}
 
   buildWin:
     if: startsWith(github.ref, 'refs/tags/20') 
@@ -217,10 +226,13 @@ jobs:
         - name: Build wheels
           uses: joerick/cibuildwheel@v3.3.0
 
+        - name: list output
+          run: ls ./wheelhouse/*.whl
+
         - uses: actions/upload-artifact@v6
           with:
             path: ./wheelhouse/*.whl
-            name: wheels
+            name: wheels-${{ matrix.os }}-${{ matrix.architecture}}
 
   buildMAC:
     if: startsWith(github.ref, 'refs/tags/20') 
@@ -233,8 +245,8 @@ jobs:
 
     name: ${{ matrix.os }} ${{ matrix.architecture}}
     env:
-      CIBW_BEFORE_ALL: "pip install numpy==2.0.0 cython"
-      CIBW_SKIP: "pp* *37* *38* *39*"
+      CIBW_BEFORE_ALL: "pip install numpy cython"
+      CIBW_SKIP: "*38* *39*"
       CIBW_ARCHS_MACOS: ${{ matrix.architecture }}
       CIBW_TEST_SKIP: "*"
 
@@ -251,7 +263,10 @@ jobs:
       - name: Build wheels
         uses: joerick/cibuildwheel@v3.3.0
 
+      - name: list output
+        run: ls ./wheelhouse/*.whl
+
       - uses: actions/upload-artifact@v6
         with:
           path: ./wheelhouse/*.whl
-          name: wheels
+          name: wheels-${{ matrix.os }}-${{ matrix.architecture}}
