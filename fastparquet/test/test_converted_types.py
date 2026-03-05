@@ -157,6 +157,34 @@ def test_big_decimal():
                       np.array([0., 777.2, 751.6, 345.1, 644.1])).all()
 
 
+def test_byte_array_decimal():
+    """Test decimal data stored as variable-length BYTE_ARRAY."""
+    schema = pt.SchemaElement(
+        type=pt.Type.BYTE_ARRAY,  # Variable length (not FIXED_LEN)
+        name="test",
+        converted_type=pt.ConvertedType.DECIMAL,
+        scale=4,
+        precision=19
+    )
+    # Create DECIMAL values as variable-length byte arrays
+    # Stored as: value * 10^scale
+    # $0.00 -> 0 * 10^4 = 0 -> b'\x00'
+    # $606.00 -> 606 * 10^4 = 6060000 -> b'\x5c\x77\xe0'
+    # $280.00 -> 280 * 10^4 = 2800000 -> b'\x2a\xb9\x80'
+    # $625.00 -> 625 * 10^4 = 6250000 -> b'\x5f\x5e\x10'
+    data = np.array([
+        b'\x00',                    # 0
+        b'\x5c\x77\xe0',           # 6,060,000 (3 bytes)
+        b'\x2a\xb9\x80',           # 2,800,000 (3 bytes)
+        b'\x5f\x5e\x10',           # 6,250,000 (3 bytes)
+    ], dtype=object)
+
+    result = convert(data, schema)
+    expected = np.array([0.0, 606.0, 280.0, 625.0])
+
+    assert np.allclose(result, expected), \
+        f"Expected {expected}, got {result}"
+
 def test_tz_nonstring(tmpdir):
     # https://github.com/dask/fastparquet/issues/578
     import uuid
