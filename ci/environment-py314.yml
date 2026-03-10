@@ -7,7 +7,7 @@ dependencies:
   - lz4
   - lzo
   - pytest
-  - pandas <3
+  - pandas<3.0
   - dask
   - pytest-cov
   - thrift
