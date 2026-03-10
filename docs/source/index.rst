@@ -3,6 +3,13 @@ fastparquet
 
 A Python interface to the Parquet file format.
 
+.. note::
+
+   March 2026. The release of pandas 3.0 has broken a number of things in ``fastparquet``. Since pandas now
+   depends explicitly on pyarrow, there is no longer any demand for the existence of this project, and it
+   is being retired. Perhaps use will continue for those still using pandas 2.x, but we anticipate no
+   further development.
+
 Introduction
 ------------
 
