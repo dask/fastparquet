@@ -178,16 +178,27 @@ def convert(data, se, timestamp96=True, dtype=None):
         if data.dtype.kind in ['i', 'f']:
             return data * scale_factor
         else:  # byte-string
-            # NB: general but slow method
-            # could optimize when data.dtype.itemsize <= 8
-            # TODO: easy cythonize (but rare)
-            # TODO: extension point for pandas-decimal (no conversion needed)
-            return np.array([
-                int.from_bytes(
-                    data.data[i:i + 1], byteorder='big', signed=True
-                ) * scale_factor
-                for i in range(len(data))
-            ])
+            # Handle both FIXED_LEN_BYTE_ARRAY and BYTE_ARRAY
+            if se.type == parquet_thrift.Type.FIXED_LEN_BYTE_ARRAY:
+                # Fixed-length: use buffer slicing approach
+                # This handles the case where numpy may truncate during iteration
+                # (see commit 53ceac2dbb141b76f603318a5cc0f78e64769d62)
+                its = data.dtype.itemsize 
+                by = data.tobytes()
+                return np.array([
+                    int.from_bytes(
+                        by[i * its:(i + 1) * its],
+                        byteorder='big', signed=True
+                    ) * scale_factor
+                    for i in range(len(data))
+                ])
+            else:
+                # Variable-length (BYTE_ARRAY): iterate over elements directly
+                # Each element is a bytes object in the object array
+                return np.array([
+                    int.from_bytes(d, byteorder='big', signed=True) * scale_factor
+                    for d in data
+                ])
     elif ctype == parquet_thrift.ConvertedType.DATE:
         data = data * DAYS_TO_NANOS
         return data.view('datetime64[ns]')
