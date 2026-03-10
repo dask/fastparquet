@@ -63,6 +63,7 @@ jobs:
       - name: Install wheels
         shell: bash -l {0}
         run: |
+          pip install "pandas<3"
           pip install ./wheelhouse/*.whl
 
       - name: Run Tests after installing numpy (${{matrix.numpy_version}})
