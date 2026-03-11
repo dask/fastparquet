@@ -1233,3 +1233,22 @@ def test_attrs_roundtrip(tempdir):
     df.to_parquet(path=fn, engine="fastparquet")
     df2 = pd.read_parquet(fn, engine="fastparquet")
     assert df2.attrs == attrs
+
+def test_categorical_with_nulls_and_filters(tempdir):
+    """Test categorical data with nulls and read with filters"""
+    fn = os.path.join(str(tempdir), 'test.parquet')
+    # Create DataFrame with categorical and nullable columns
+    df = pd.DataFrame({
+        'cat_col': ['A', 'B', None, 'C'] * 2,
+        'filter_col': list(range(8)),
+        'nullable_int': pd.array([1, None, 3, 4] * 2, dtype="Int64")
+    })
+    df['cat_col'] = df['cat_col'].astype('category')
+    # Write DataFrame
+    write(fn, df, file_scheme='hive', row_group_offsets=[0, 4])
+    # Test reading with row_filter and value filter
+    pf = ParquetFile(fn)
+    # Test with row_filter=True and filter_col > 6
+    df_filtered = pf.to_pandas(filters=[('filter_col', '>', 6)], row_filter=True)
+    expected = df[df['filter_col'] > 6].reset_index(drop=True)
+    assert_frame_equal(df_filtered, expected)
