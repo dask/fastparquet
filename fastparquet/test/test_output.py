@@ -1233,3 +1233,91 @@ def test_attrs_roundtrip(tempdir):
     df.to_parquet(path=fn, engine="fastparquet")
     df2 = pd.read_parquet(fn, engine="fastparquet")
     assert df2.attrs == attrs
+
+
+def test_append_different_categorical_simple(tempdir):
+    """Test for issue #949: wrong categories data when appending with categorical columns"""
+    fn = os.path.join(str(tempdir), 'test.parquet')
+    # First DataFrame with a categorical column
+    df1 = pd.DataFrame({
+        "col1": [1, 4, 7],
+        "col2": [2, 5, 8]
+    })
+    df1["col2"] = df1["col2"].astype("category")
+    write(fn, df1, write_index=False, file_scheme='simple')
+    # Second DataFrame to append
+    df2 = pd.DataFrame({
+        "col1": [4, 7, 10],
+        "col2": [5, 8, 11]
+    })
+    df2["col2"] = df2["col2"].astype("category")
+    write(fn, df2, append=True, write_index=False, file_scheme='simple')
+    # Read back again - this should maintain correct categorical values
+    df_combined = pd.read_parquet(fn, engine="fastparquet")
+    # Expected result when concatenating the two dataframes
+    expected = pd.concat([df1, df2], ignore_index=True)
+    expected["col2"] = expected["col2"].astype("category")
+    assert_frame_equal(df_combined, expected)
+
+
+def test_append_different_categorical_multi(tempdir):
+    """Test for issue #949: wrong categories data when appending with categorical columns"""
+    # Testing ParquetFile slicing as well.
+    # Set random seed for reproducibility
+    np.random.seed(42)
+    # Create initial DataFrame with categorical columns
+    def create_test_df(start_idx, rows, cats1, cats2):
+        cat1 = [cats1[i % len(cats1)] for i in range(rows)]
+        cat2 = [cats2[i % len(cats2)] for i in range(rows)]
+        df = pd.DataFrame({
+            'cat_col1': cat1,
+            'cat_col2': cat2,
+            'value': np.random.rand(rows)
+        })
+        df['cat_col1'] = df['cat_col1'].astype('category')
+        df['cat_col2'] = df['cat_col2'].astype('category')
+        return df
+    # Initial categories
+    cats1 = ['A', 'B', 'C']
+    cats2 = [10, 20, 30] 
+    # First dataframe
+    fn = os.path.join(str(tempdir), 'test_parquet')
+    df1 = create_test_df(0, 5, cats1, cats2)
+    write(fn, df1,  file_scheme='hive', write_index=False)
+    # New categories for second dataframe (overlapping + new values)
+    cats1_2 = ['B', 'C', 'D']  # B,C overlap with first df, D is new
+    cats2_2 = [30, 40, 50]
+    # Create second dataframe
+    df2 = create_test_df(len(df1), 6, cats1_2, cats2_2)
+    # Append second dataframe
+    write(fn, df2, file_scheme='hive', append=True, write_index=False)
+    # New categories for third dataframe (different ordering + new values)
+    cats1_3 = ['E', 'C', 'A']  # A,C from first, E is new
+    cats2_3 = [60, 70, 50]  # Mixed order
+    # Create third dataframe
+    df3 = create_test_df(len(df1)+len(df2), 7, cats1_3, cats2_3)
+    # Append third dataframe
+    write(fn, df3, file_scheme='hive', append=True, write_index=False)
+    # Combine all original dataframes for comparison
+    expected_df = pd.concat([df1, df2, df3], axis=0, ignore_index=True)
+    expected_df['cat_col1'] = expected_df['cat_col1'].astype('category')
+    expected_df['cat_col2'] = expected_df['cat_col2'].astype('category')
+    pf = ParquetFile(fn)
+    actual_df = pf.to_pandas()
+    # Assert that the dataframes are equal
+    assert_frame_equal(expected_df, actual_df)
+    # Test slicing.
+    actual_df_subset = pf[1:].to_pandas()
+    expected_df_subset = pd.concat([df2, df3], axis=0, ignore_index=True)
+    expected_df_subset['cat_col1'] = expected_df_subset['cat_col1'].astype('category')
+    expected_df_subset['cat_col2'] = expected_df_subset['cat_col2'].astype('category')
+    try:
+        # Code to manage new categorical values in fastparquet does not reorder them.
+        # Code in pandas concat seems to do so.
+        actual_df_subset['cat_col1'] = actual_df_subset['cat_col1'].cat.reorder_categories(
+            expected_df_subset['cat_col1'].cat.categories
+        )
+    except ValueError:
+        raise AssertionError("failed to reorder categories")
+    assert_frame_equal(expected_df_subset, actual_df_subset)
+
