@@ -15,7 +15,7 @@ from fastparquet.json import json_decoder
 from fastparquet.util import (default_open, default_remove, ParquetException, val_to_num,
                    ops, ensure_bytes, ensure_str, check_column_names, metadata_from_many,
                    ex_from_sep, _strip_path_tail, get_fs, PANDAS_VERSION, join_path)
-from fastparquet.encoding import _HAVE_ARROW
+from fastparquet.encoding import _HAVE_ARROW, _USE_ARROW_STRINGS
 
 if _HAVE_ARROW:
     import pyarrow as _pa
@@ -786,7 +786,7 @@ selection does not match number of rows in DataFrame.')
         # Skip columns whose dtype was explicitly requested as object (via dtypes=)
         # to honour the caller's preference and to handle schema-evolution cases.
         arrow_string_columns = {}
-        if _HAVE_ARROW:
+        if _HAVE_ARROW and _USE_ARROW_STRINGS:
             _cats = categories or {}
             # Resolve user-supplied dtype overrides only (not auto-inferred ones).
             # Auto-inferred dtypes always show dtype('O') for UTF-8 columns, so
@@ -841,7 +841,7 @@ selection does not match number of rows in DataFrame.')
             start += thislen
 
         # Finalize arrow string columns: concatenate per-page arrays and assign.
-        if _HAVE_ARROW:
+        if _HAVE_ARROW and _USE_ARROW_STRINGS:
             for col, parts in arrow_string_columns.items():
                 if not parts:
                     continue

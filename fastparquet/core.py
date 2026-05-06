@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 
 from fastparquet import encoding
-from fastparquet.encoding import read_plain, _HAVE_ARROW
+from fastparquet.encoding import read_plain, _HAVE_ARROW, _USE_ARROW_STRINGS
 import fastparquet.cencoding as encoding
 from fastparquet.compression import decompress_data, rev_map, decom_into
 from fastparquet.converted_types import convert, simple, converts_inplace
@@ -308,7 +308,7 @@ def read_data_page_v2(infile, schema_helper, se, data_header2, cmd,
         raw_bytes = decompress_data(np.frombuffer(infile.read(size), "uint8"),
                                     uncompressed_page_size, codec)
         # Arrow path: build ArrowStringArray directly without Python str objects.
-        if (arrow_parts is not None and _HAVE_ARROW
+        if (arrow_parts is not None and _HAVE_ARROW and _USE_ARROW_STRINGS
                 and se.converted_type == parquet_thrift.ConvertedType.UTF8
                 and not use_cat):
             raw_np = np.asarray(raw_bytes, dtype=np.uint8)
@@ -487,9 +487,11 @@ def read_col(column, schema_helper, infile, use_cat=False,
     rows = row_filter.sum() if isinstance(row_filter, np.ndarray) else cmd.num_values
 
     # Determine whether to use the arrow accumulation path for this column.
-    # Conditions: pyarrow available, utf=True schema element, caller provided a list.
+    # Conditions: pyarrow available, arrow strings are the default, utf=True
+    # schema element, and caller provided a list to accumulate into.
     use_arrow = (
         _HAVE_ARROW
+        and _USE_ARROW_STRINGS
         and arrow_parts is not None
         and not use_cat
         and se.converted_type == parquet_thrift.ConvertedType.UTF8

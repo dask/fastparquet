@@ -82,12 +82,18 @@ def test_text_schema(tempdir):
     write(fn, df)
     p = ParquetFile(fn)
     t = p.schema.text
-    expected = ('- schema: \n'
-                '| - A: DOUBLE, OPTIONAL\n'
-                '| - B: DOUBLE, OPTIONAL\n'
-                '| - C: BYTE_ARRAY, UTF8, OPTIONAL\n'
-                '  - D: INT64, TIMESTAMP[MICROS], TIMESTAMP_MICROS, OPTIONAL')
-    assert t == expected
+    # pandas 2 uses nanosecond timestamps (NANOS), pandas 3 uses microseconds (MICROS)
+    expected_micros = ('- schema: \n'
+                       '| - A: DOUBLE, OPTIONAL\n'
+                       '| - B: DOUBLE, OPTIONAL\n'
+                       '| - C: BYTE_ARRAY, UTF8, OPTIONAL\n'
+                       '  - D: INT64, TIMESTAMP[MICROS], TIMESTAMP_MICROS, OPTIONAL')
+    expected_nanos = ('- schema: \n'
+                      '| - A: DOUBLE, OPTIONAL\n'
+                      '| - B: DOUBLE, OPTIONAL\n'
+                      '| - C: BYTE_ARRAY, UTF8, OPTIONAL\n'
+                      '  - D: INT64, TIMESTAMP[NANOS], OPTIONAL')
+    assert t in (expected_micros, expected_nanos)
     assert repr(p.schema) == "<Parquet Schema with 5 entries>"
 
 
