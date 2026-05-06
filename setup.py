@@ -39,7 +39,7 @@ else:
             return [s.replace('.pyx', '.c') for s in sources]
 
     modules = [
-        Extension(mod, fix_exts(sources))
+        Extension(mod, fix_exts(sources), extra_compile_args=['-O3', '-march=native'])
         for mod, sources in modules_to_build.items()]
     extra = {'ext_modules': cythonize(modules, language_level=3)}
 

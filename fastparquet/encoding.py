@@ -4,6 +4,13 @@ from fastparquet.cencoding import read_bitpacked1, NumpyIO
 from fastparquet.speedups import unpack_byte_array
 from fastparquet import parquet_thrift
 
+try:
+    import pyarrow as _pa  # noqa: F401
+    from fastparquet.speedups import unpack_byte_array_arrow as _unpack_arrow
+    _HAVE_ARROW = True
+except ImportError:
+    _HAVE_ARROW = False
+
 
 def read_plain_boolean(raw_bytes, count, out=None):
     data = np.frombuffer(raw_bytes, dtype='uint8')
@@ -38,4 +45,9 @@ def read_plain(raw_bytes, type_, count, width=0, utf=False, stat=False):
                 return np.array([bytes(raw_bytes).decode()], dtype='O')
             else:
                 return np.array([bytes(raw_bytes)], dtype='O')
+        if utf and _HAVE_ARROW:
+            # Build an ArrowStringArray directly from the packed bytes, without
+            # creating intermediate Python str objects in the inner loop.
+            raw_np = np.frombuffer(memoryview(raw_bytes), dtype=np.uint8)
+            return _unpack_arrow(raw_np, count)
         return unpack_byte_array(raw_bytes, count, utf=utf)

@@ -476,7 +476,7 @@ def get_numpy_type(dtype):
         return str(dtype).lower()
     elif str(dtype) == "boolean":
         return "bool"
-    elif str(dtype) == "string":
+    elif str(dtype) in ("string", "str"):
         return "object"
     else:
         return str(dtype)

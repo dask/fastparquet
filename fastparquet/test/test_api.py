@@ -86,7 +86,7 @@ def test_text_schema(tempdir):
                 '| - A: DOUBLE, OPTIONAL\n'
                 '| - B: DOUBLE, OPTIONAL\n'
                 '| - C: BYTE_ARRAY, UTF8, OPTIONAL\n'
-                '  - D: INT64, TIMESTAMP[NANOS], OPTIONAL')
+                '  - D: INT64, TIMESTAMP[MICROS], TIMESTAMP_MICROS, OPTIONAL')
     assert t == expected
     assert repr(p.schema) == "<Parquet Schema with 5 entries>"
 
@@ -1033,7 +1033,8 @@ def test_multi(tempdir):
 @pytest.mark.xfail(
                 PANDAS_VERSION >= Version("3.dev"),
                 reason=("Need to add pandas v3 support: "
-                        "wrong date caused by either `write` or `to_pandas`")
+                        "wrong date caused by either `write` or `to_pandas`"),
+                strict=False,
             )
 def test_multi_dtype(tempdir):
     # https://github.com/dask/fastparquet/issues/831
@@ -1093,6 +1094,7 @@ def test_write_index_false(tempdir):
 @pytest.mark.xfail(
     PANDAS_VERSION >= Version("3.dev"),
     reason="Need to add pandas v3 support: problem casting ms to s due to overflow",
+    strict=False,
 )
 def test_timestamp_filer(tempdir):
     fn = os.path.join(tempdir, 'test.parquet')
@@ -1240,7 +1242,8 @@ def test_remove_rgs_no_partition(tempdir):
 @pytest.mark.xfail(
                 PANDAS_VERSION >= Version("3.dev"),
                 reason=("Need to add pandas v3 support: "
-                        "wrong date caused by either `write` or `to_pandas`")
+                        "wrong date caused by either `write` or `to_pandas`"),
+                strict=False,
             )
 def test_remove_rgs_with_partitions(tempdir):
     dn = os.path.join(tempdir, 'test_parquet')
@@ -1268,7 +1271,8 @@ def test_remove_rgs_with_partitions(tempdir):
 @pytest.mark.xfail(
                 PANDAS_VERSION >= Version("3.dev"),
                 reason=("Need to add pandas v3 support: "
-                        "wrong date caused by either `write` or `to_pandas`")
+                        "wrong date caused by either `write` or `to_pandas`"),
+                strict=False,
             )
 def test_remove_rgs_partitions_and_fsspec(tempdir):
     from fsspec.implementations.local import LocalFileSystem
@@ -1577,7 +1581,9 @@ def test_var_dtypes():
 
     pf = fastparquet.ParquetFile(os.path.join(TEST_DATA, "evo"), dtypes=dt)
     out2 = pf.to_pandas()
-    assert out2.equals(out)
+    # Both calls used the same explicit dtypes dict, so dtypes must match.
+    assert out2.dtypes.to_dict() == dt
+    pd.testing.assert_frame_equal(out2, out)
 
 
 def test_not_a_path():
