@@ -358,7 +358,7 @@ def test_multi_index(tempdir):
     assert dg.shape == (3, 1)
     assert len(dg.index.levels) == 2
     assert dg.index.levels[0].name == 'a'
-    assert dg.index.levels[0].dtype == '<M8[ns]'
+    assert dg.index.levels[0].dtype in ('<M8[ns]', '<M8[us]')
     assert dg.index.levels[1].name == 'b'
     assert dg.index.levels[1].dtype == np.int64
 
@@ -373,7 +373,7 @@ def test_multi_index_category(tempdir):
     assert dg.shape == (3, 1)
     assert len(dg.index.levels) == 2
     assert dg.index.levels[0].name == 'a'
-    assert dg.index.levels[0].dtype == '<M8[ns]'
+    assert dg.index.levels[0].dtype in ('<M8[ns]', '<M8[us]')
     assert dg.index.levels[1].name == 'b'
     assert str(dg.c.tolist()) == str(df.c.tolist())  # ignore nan and cats
 
@@ -570,6 +570,7 @@ def test_column_multiindex_roundtrip(tempdir):
 @pytest.mark.xfail(
     PANDAS_VERSION >= Version("3.dev"),
     reason="Need to add pandas v3 support: problem casting ms to s due to overflow",
+    strict=False,
 )
 def test_sparse_column_multiindex_no_row_index(tempdir):
     ts = [pd.Timestamp('2021/01/01 08:00:00'),

@@ -167,9 +167,13 @@ def convert(data, se, timestamp96=True, dtype=None):
     if ctype is None:
         return data
     if ctype == parquet_thrift.ConvertedType.UTF8:
+        import pandas as pd
+        if isinstance(data.dtype, pd.StringDtype):
+            # pandas 3+: data is already an arrow-backed string array (decoded),
+            # no further conversion needed.
+            return data
         if data.dtype != "O" or (len(data) == 1 and not isinstance(data[0], str)):
-            # fixed string
-            import pandas as pd
+            # fixed-length byte string (e.g. FIXED_LEN_BYTE_ARRAY): decode to str
             return pd.Series(data).str.decode("utf8").values
         # already converted in speedups.unpack_byte_array
         return data
@@ -204,7 +208,7 @@ def convert(data, se, timestamp96=True, dtype=None):
         return data.view('datetime64[ns]')
     elif ctype == parquet_thrift.ConvertedType.TIME_MILLIS:
         # this was not covered by new pandas time units
-        data = data.astype('int64', copy=False)
+        data = data.astype('int64')
         time_shift(data, 1000000)
         return data.view('timedelta64[ns]')
     elif ctype == parquet_thrift.ConvertedType.TIMESTAMP_MILLIS:

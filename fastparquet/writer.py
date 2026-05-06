@@ -572,15 +572,15 @@ def write_column(f, data0, selement, compression=None, datapage_version=None,
             # the null-stripped `data` can be converted from Optional Types to
             # their numpy counterparts
             if isinstance(data.dtype, BaseMaskedDtype) and data.dtype in pdoptional_to_numpy_typemap:
-                data = data.astype(pdoptional_to_numpy_typemap[data.dtype], copy=False)
+                data = data.astype(pdoptional_to_numpy_typemap[data.dtype])
             if data.dtype.kind == "O" and not isinstance(data.dtype, pd.CategoricalDtype):
                 try:
                     if selement.type == parquet_thrift.Type.INT64:
-                        data = data.astype("int64", copy=False)
+                        data = data.astype("int64")
                     elif selement.type == parquet_thrift.Type.INT32:
-                        data = data.astype("int32", copy=False)
+                        data = data.astype("int32")
                     elif selement.type == parquet_thrift.Type.BOOLEAN:
-                        data = data.astype(bool, copy=False)
+                        data = data.astype(bool)
                 except ValueError as e:
                     t = parquet_thrift.Type._VALUES_TO_NAMES[selement.type]
                     raise ValueError('Error converting column "%s" to primitive '

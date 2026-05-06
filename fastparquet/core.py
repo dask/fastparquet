@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 
 from fastparquet import encoding
-from fastparquet.encoding import read_plain
+from fastparquet.encoding import read_plain, _HAVE_ARROW, _USE_ARROW_STRINGS
 import fastparquet.cencoding as encoding
 from fastparquet.compression import decompress_data, rev_map, decom_into
 from fastparquet.converted_types import convert, simple, converts_inplace
@@ -11,6 +11,10 @@ from fastparquet.speedups import unpack_byte_array
 from fastparquet import parquet_thrift
 from fastparquet.cencoding import ThriftObject
 from fastparquet.util import val_to_num
+
+if _HAVE_ARROW:
+    import pyarrow as _pa
+    from fastparquet.speedups import unpack_byte_array_arrow as _unpack_arrow
 
 
 def _read_page(file_obj, page_header, column_metadata):
@@ -200,7 +204,7 @@ def read_dictionary_page(file_obj, schema_helper, page_header, column_metadata, 
 
 def read_data_page_v2(infile, schema_helper, se, data_header2, cmd,
                       dic, assign, num, use_cat, file_offset, ph, idx=None,
-                      selfmade=False, row_filter=None):
+                      selfmade=False, row_filter=None, arrow_parts=None):
     """
     :param infile: open file
     :param schema_helper:
@@ -303,22 +307,35 @@ def read_data_page_v2(infile, schema_helper, se, data_header2, cmd,
         codec = cmd.codec if data_header2.is_compressed else "UNCOMPRESSED"
         raw_bytes = decompress_data(np.frombuffer(infile.read(size), "uint8"),
                                     uncompressed_page_size, codec)
-        values = read_plain(raw_bytes,
-                            cmd.type,
-                            n_values,
-                            width=se.type_length,
-                            utf=se.converted_type == 0)
-        if data_header2.num_nulls:
-            if nullable:
-                assign[num:num+data_header2.num_values][~nulls[row_filter]] = convert(values, se)[row_filter]
+        # Arrow path: build ArrowStringArray directly without Python str objects.
+        if (arrow_parts is not None and _HAVE_ARROW and _USE_ARROW_STRINGS
+                and se.converted_type == parquet_thrift.ConvertedType.UTF8
+                and not use_cat):
+            raw_np = np.asarray(raw_bytes, dtype=np.uint8)
+            if data_header2.num_nulls:
+                # defi was read above; use it as the validity array for the Cython builder
+                arrow_page = _unpack_arrow(raw_np, n_values, validity=defi,
+                                           n_total=data_header2.num_values)
             else:
-                assign[num:num+data_header2.num_values][nulls[row_filter]] = None  # or nan or nat
-                if row_filter is Ellipsis:
-                    assign[num:num+data_header2.num_values][~nulls] = convert(values, se)
-                else:
-                    assign[num:num+data_header2.num_values][~nulls[row_filter]] = convert(values, se)[row_filter[~nulls]]
+                arrow_page = _unpack_arrow(raw_np, n_values)
+            arrow_parts.append(arrow_page._pa_array.combine_chunks())
         else:
-            assign[num:num+data_header2.num_values] = convert(values, se)[row_filter]
+            values = read_plain(raw_bytes,
+                                cmd.type,
+                                n_values,
+                                width=se.type_length,
+                                utf=se.converted_type == 0)
+            if data_header2.num_nulls:
+                if nullable:
+                    assign[num:num+data_header2.num_values][~nulls[row_filter]] = convert(values, se)[row_filter]
+                else:
+                    assign[num:num+data_header2.num_values][nulls[row_filter]] = None  # or nan or nat
+                    if row_filter is Ellipsis:
+                        assign[num:num+data_header2.num_values][~nulls] = convert(values, se)
+                    else:
+                        assign[num:num+data_header2.num_values][~nulls[row_filter]] = convert(values, se)[row_filter[~nulls]]
+            else:
+                assign[num:num+data_header2.num_values] = convert(values, se)[row_filter]
     elif (use_cat and data_header2.encoding in [
         parquet_thrift.Encoding.PLAIN_DICTIONARY,
         parquet_thrift.Encoding.RLE_DICTIONARY,
@@ -429,7 +446,7 @@ def read_data_page_v2(infile, schema_helper, se, data_header2, cmd,
 
 def read_col(column, schema_helper, infile, use_cat=False,
              selfmade=False, assign=None, catdef=None,
-             row_filter=None):
+             row_filter=None, arrow_parts=None):
     """Using the given metadata, read one column in one row-group.
 
     Parameters
@@ -447,6 +464,12 @@ def read_col(column, schema_helper, infile, use_cat=False,
         if given, selects which of the values read are to be written
         into the output. Effectively implies NULLs, even for a required
         column.
+    arrow_parts: list or None
+        If provided, and if pyarrow is available, UTF-8 string pages are
+        accumulated as pyarrow arrays in this list instead of being assigned
+        into the (object-dtype) ``assign`` array.  The caller is responsible
+        for concatenating and assigning the final ArrowStringArray to the
+        DataFrame column after all row groups are consumed.
     """
     cmd = column.meta_data
     try:
@@ -462,6 +485,17 @@ def read_col(column, schema_helper, infile, use_cat=False,
     column_binary = infile.read(cmd.total_compressed_size)
     infile = encoding.NumpyIO(column_binary)
     rows = row_filter.sum() if isinstance(row_filter, np.ndarray) else cmd.num_values
+
+    # Determine whether to use the arrow accumulation path for this column.
+    # Conditions: pyarrow available, arrow strings are the default, utf=True
+    # schema element, and caller provided a list to accumulate into.
+    use_arrow = (
+        _HAVE_ARROW
+        and _USE_ARROW_STRINGS
+        and arrow_parts is not None
+        and not use_cat
+        and se.converted_type == parquet_thrift.ConvertedType.UTF8
+    )
 
     if use_cat:
         my_nan = -1
@@ -509,7 +543,7 @@ def read_col(column, schema_helper, infile, use_cat=False,
         if ph.type == parquet_thrift.PageType.DATA_PAGE_V2:
             num += read_data_page_v2(infile, schema_helper, se, ph.data_page_header_v2, cmd,
                                      dic, assign, num, use_cat, off, ph, row_idx, selfmade=selfmade,
-                                     row_filter=row_filter)
+                                     row_filter=row_filter, arrow_parts=arrow_parts)
             continue
         if (selfmade and hasattr(cmd, 'statistics') and
                 getattr(cmd.statistics, 'null_count', 1) == 0):
@@ -542,6 +576,32 @@ def read_col(column, schema_helper, infile, use_cat=False,
                 raise ValueError('Returning category type requires all chunks'
                                  ' to use dictionary encoding; column: %s',
                                  cmd.path_in_schema)
+
+        # Arrow accumulation path: val is an ArrowStringArray from read_plain
+        # (when pyarrow is installed and se.converted_type == UTF8).
+        # We cannot slice-assign ArrowStringArray into a numpy array, so we
+        # append the per-page arrow chunk to arrow_parts and skip the numpy path.
+        if use_arrow and isinstance(val, pd.arrays.ArrowStringArray):
+            n_page = len(defi) if defi is not None else len(val)
+            if defi is not None:
+                # Build a null-padded arrow array: valid positions from val,
+                # null positions marked in the arrow null bitmap.
+                raw_bytes = val._pa_array.combine_chunks()
+                # Flatten to a binary array so we can call the fast Cython builder
+                binary = raw_bytes.cast(_pa.large_binary())
+                from fastparquet.speedups import pack_byte_array as _pack
+                packed = _pack(binary.to_pylist())
+                packed_np = np.frombuffer(packed, dtype=np.uint8)
+                arrow_page = _unpack_arrow(
+                    packed_np, len(val),
+                    validity=defi,
+                    n_total=n_page,
+                )
+            else:
+                arrow_page = val
+            arrow_parts.append(arrow_page._pa_array.combine_chunks())
+            num += n_page
+            continue
 
         if rep is not None:
             null = not schema_helper.is_required(cmd.path_in_schema[0])
@@ -589,17 +649,28 @@ def read_col(column, schema_helper, infile, use_cat=False,
 
 
 def read_row_group_arrays(file, rg, columns, categories, schema_helper, cats,
-                          selfmade=False, assign=None, row_filter=False):
+                          selfmade=False, assign=None, row_filter=False,
+                          arrow_string_columns=None):
     """
     Read a row group and return as a dict of arrays
 
     Note that categorical columns (if appearing in the parameter categories)
     will be pandas Categorical objects: the codes and the category labels
     are arrays.
+
+    Parameters
+    ----------
+    arrow_string_columns : dict or None
+        If provided (and pyarrow is available), maps column name to a list that
+        accumulates per-page ``pyarrow.Array`` objects for that column.  String
+        pages are appended here instead of being stored in the pre-allocated
+        object array.  The caller concatenates and assigns the final
+        ``ArrowStringArray`` after all row groups are processed.
     """
     out = assign
     remains = set(_ for _ in out if not _.endswith("-catdef") and not _ + "-catdef" in out)
     maps = {}
+    arrow_string_columns = arrow_string_columns or {}
 
     for column in rg.columns:
 
@@ -615,7 +686,8 @@ def read_row_group_arrays(file, rg, columns, categories, schema_helper, cats,
         read_col(column, schema_helper, file, use_cat=name+'-catdef' in out,
                  selfmade=selfmade, assign=out[name],
                  catdef=out.get(name+'-catdef', None),
-                 row_filter=row_filter)
+                 row_filter=row_filter,
+                 arrow_parts=arrow_string_columns.get(name))
 
         if _is_map_like(schema_helper, column):
             # TODO: could be done in fast loop in _assemble_objects?
@@ -634,7 +706,8 @@ def read_row_group_arrays(file, rg, columns, categories, schema_helper, cats,
 
 def read_row_group(file, rg, columns, categories, schema_helper, cats,
                    selfmade=False, index=None, assign=None,
-                   scheme='hive', partition_meta=None, row_filter=False):
+                   scheme='hive', partition_meta=None, row_filter=False,
+                   arrow_string_columns=None):
     """
     Access row-group in a file and read some columns into a data-frame.
     """
@@ -642,7 +715,8 @@ def read_row_group(file, rg, columns, categories, schema_helper, cats,
     if assign is None:
         raise RuntimeError('Going with pre-allocation!')
     read_row_group_arrays(file, rg, columns, categories, schema_helper,
-                          cats, selfmade, assign=assign, row_filter=row_filter)
+                          cats, selfmade, assign=assign, row_filter=row_filter,
+                          arrow_string_columns=arrow_string_columns)
 
     for cat in cats:
         if cat not in assign:

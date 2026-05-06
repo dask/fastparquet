@@ -15,6 +15,10 @@ from fastparquet.json import json_decoder
 from fastparquet.util import (default_open, default_remove, ParquetException, val_to_num,
                    ops, ensure_bytes, ensure_str, check_column_names, metadata_from_many,
                    ex_from_sep, _strip_path_tail, get_fs, PANDAS_VERSION, join_path)
+from fastparquet.encoding import _HAVE_ARROW, _USE_ARROW_STRINGS
+
+if _HAVE_ARROW:
+    import pyarrow as _pa
 
 
 # Find in names of partition files the integer matching "**part.*.parquet",
@@ -102,11 +106,16 @@ class ParquetFile(object):
     _pdm = None
     _kvm = None
     _categories = None
+    _user_dtypes = False  # whether _base_dtype was user-supplied
 
     def __init__(self, fn, verify=False, open_with=default_open, root=False,
                  sep=None, fs=None, pandas_nulls=True, dtypes=None):
         self.pandas_nulls = pandas_nulls
         self._base_dtype = dtypes
+        # Track whether _base_dtype was user-supplied (True) or auto-inferred (False).
+        # This is needed so that an auto-inferred dtype('O') for a UTF-8 column
+        # does not prevent the arrow string path from activating.
+        self._user_dtypes = dtypes is not None
         self.tz = None
         self._columns_dtype = None
         if open_with is default_open and fs is None:
@@ -346,7 +355,7 @@ class ParquetFile(object):
 
     def read_row_group_file(self, rg, columns, categories, index=None,
                             assign=None, partition_meta=None, row_filter=False,
-                            infile=None):
+                            infile=None, arrow_string_columns=None):
         """ Open file for reading, and process it as a row-group
 
         assign is None if this method is called directly (not from to_pandas),
@@ -389,7 +398,7 @@ class ParquetFile(object):
             f, rg, columns, categories, self.schema, self.cats,
             selfmade=self.selfmade, index=index,
             assign=assign, scheme=self.file_scheme, partition_meta=partition_meta,
-            row_filter=row_filter
+            row_filter=row_filter, arrow_string_columns=arrow_string_columns,
         )
         if ret:
             return df
@@ -665,26 +674,26 @@ scheme is 'simple'.")
                 if name in self.cats:
                     continue
                 if op == 'in':
-                    out |= df[name].isin(val).values
+                    out |= np.asarray(df[name].isin(val), dtype=bool)
                 elif op == "not in":
-                    out |= ~df[name].isin(val).values
+                    out |= ~np.asarray(df[name].isin(val), dtype=bool)
                 elif op in ops:
-                    out |= ops[op](df[name], val).values
+                    out |= np.asarray(ops[op](df[name], val), dtype=bool)
                 elif op == "~":
-                    out |= ~df[name].values
+                    out |= ~np.asarray(df[name], dtype=bool)
             else:
                 and_part = np.ones(len(df), dtype=bool)
                 for name, op, val in or_part:
                     if name in self.cats:
                         continue
                     if op == 'in':
-                        and_part &= df[name].isin(val).values
+                        and_part &= np.asarray(df[name].isin(val), dtype=bool)
                     elif op == "not in":
-                        and_part &= ~df[name].isin(val).values
+                        and_part &= ~np.asarray(df[name].isin(val), dtype=bool)
                     elif op in ops:
-                        and_part &= ops[op](df[name].values, val)
+                        and_part &= np.asarray(ops[op](df[name], val), dtype=bool)
                     elif op == "~":
-                        and_part &= ~df[name].values
+                        and_part &= ~np.asarray(df[name], dtype=bool)
                 out |= and_part
         return out
 
@@ -771,6 +780,44 @@ selection does not match number of rows in DataFrame.')
             import json
             df.attrs = json.loads(self.key_value_metadata["PANDAS_ATTRS"])
 
+        # Build per-column accumulators for arrow string columns.
+        # Object-dtype columns whose parquet schema marks them as UTF-8 will
+        # use the fast Cython path that builds ArrowStringArray directly.
+        # Skip columns whose dtype was explicitly requested as object (via dtypes=)
+        # to honour the caller's preference and to handle schema-evolution cases.
+        arrow_string_columns = {}
+        if _HAVE_ARROW and _USE_ARROW_STRINGS:
+            _cats = categories or {}
+            # Resolve user-supplied dtype overrides only (not auto-inferred ones).
+            # Auto-inferred dtypes always show dtype('O') for UTF-8 columns, so
+            # including them would block the arrow path for all string columns.
+            _user_dtypes = {}
+            if self._user_dtypes and self._base_dtype:
+                _user_dtypes.update(self._base_dtype)
+            if dtypes is not None:
+                _user_dtypes.update(dtypes)
+            # Detect schema-evolution columns: absent from some row groups.
+            # For those, the existing object-array fallback is more reliable.
+            _schema_evo_cols = set()
+            if len(rgs) > 1:
+                for rg in rgs:
+                    rg_cols = {'.'.join(c.meta_data.path_in_schema)
+                               for c in rg.columns}
+                    for col in df.columns:
+                        if col not in rg_cols:
+                            _schema_evo_cols.add(col)
+            for col in df.columns:
+                if (df[col].dtype == np.dtype('O')
+                        and col not in _cats
+                        and col not in _schema_evo_cols
+                        and _user_dtypes.get(col) != np.dtype('O')):
+                    arrow_string_columns[col] = []
+            # Also check index columns that are object dtype
+            if hasattr(df.index, 'dtype') and df.index.dtype == np.dtype('O'):
+                idx_name = df.index.name
+                if idx_name and idx_name in columns and idx_name not in _schema_evo_cols:
+                    arrow_string_columns[idx_name] = []
+
         start = 0
         if self.file_scheme == 'simple':
             infile = self.open(self.fn, 'rb')
@@ -789,8 +836,27 @@ selection does not match number of rows in DataFrame.')
                      for (name, v) in views.items()}
             self.read_row_group_file(rg, columns, categories, index,
                                      assign=parts, partition_meta=self.partition_meta,
-                                     row_filter=sel, infile=infile)
+                                     row_filter=sel, infile=infile,
+                                     arrow_string_columns=arrow_string_columns)
             start += thislen
+
+        # Finalize arrow string columns: concatenate per-page arrays and assign.
+        if _HAVE_ARROW and _USE_ARROW_STRINGS:
+            for col, parts in arrow_string_columns.items():
+                if not parts:
+                    continue
+                final_arr = _pa.concat_arrays(parts)
+                if len(final_arr) != len(df):
+                    # Schema evolution: column absent in some row groups.  The
+                    # pre-allocated object array already has None for the missing
+                    # rows; skip the arrow conversion so callers see partial data.
+                    continue
+                arrow_str = pd.arrays.ArrowStringArray(_pa.chunked_array([final_arr]))
+                if col in df.columns:
+                    df[col] = pd.Series(arrow_str, index=df.index, name=col)
+                elif col == df.index.name:
+                    df.index = pd.Index(arrow_str, name=col)
+
         return df
 
     def pre_allocate(self, size, columns, categories, index, dtypes=None):

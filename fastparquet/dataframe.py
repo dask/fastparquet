@@ -158,6 +158,10 @@ def empty(types, size, cats=None, cols=None, index_types=None, index_names=None,
             else:
                 d = np.empty(size, dtype=dtype)
                 index = Index(d)
+                # In pandas 3, pd.Index(array) copies its backing array, so we
+                # must use index._data (the actual internal array) as the view.
+                # Writing to views[col] will then correctly update the index.
+                d = index._data
             views[col] = d
     else:
         index = MultiIndex([[]], [[]])
@@ -166,6 +170,11 @@ def empty(types, size, cats=None, cols=None, index_types=None, index_names=None,
         index._labels = list()
         index._codes = list()
         index._names = list(index_names)
+        # In pandas 3, MultiIndex.levels is a cache_readonly property that was
+        # already cached at construction time.  After we replace _levels with a
+        # new Python list, we must clear the cache so that .levels reflects our
+        # list.  This also needs to happen each time set_cats updates a level.
+        index._cache.clear()
         for i, col in enumerate(index_names):
             index._levels.append(Index([None]))
 
@@ -176,6 +185,8 @@ def empty(types, size, cats=None, cols=None, index_types=None, index_names=None,
                 elif not index._levels[i].equals(values):
                     raise RuntimeError("Different dictionaries encountered"
                                        " while building categorical")
+                # Invalidate the cached .levels so that callers see the update.
+                index._cache.pop('levels', None)
 
             x = Dummy()
             x._set_categories = set_cats

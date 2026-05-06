@@ -42,6 +42,43 @@ jobs:
         shell: bash -l {0}
         run: |
           pytest --verbose --cov=fastparquet
+
+  linux-pandas3:
+    name: ${{ matrix.CONDA_ENV }}-pandas3-pytest
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        CONDA_ENV: [py312, py313, py314]
+    steps:
+      - name: APT
+        run: sudo apt-get install liblzo2-dev
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch upstream tags
+        run: |
+          git remote add upstream https://github.com/dask/fastparquet.git
+          git fetch upstream --tags
+
+      - name: Setup conda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          environment-file: ci/environment-${{ matrix.CONDA_ENV }}-pandas3.yml
+
+      - name: pip-install
+        shell: bash -l {0}
+        run: |
+          pip install -e . --no-deps
+
+      - name: Run Tests
+        shell: bash -l {0}
+        run: |
+          pytest --verbose --cov=fastparquet
+
   v2:
     name: v2-py310
     runs-on: ubuntu-latest
@@ -156,3 +193,4 @@ jobs:
         shell: bash -l {0}
         run: |
           pytest --verbose --cov=fastparquet
+

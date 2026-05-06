@@ -68,7 +68,8 @@ def test_timestamp_millis():
                 PANDAS_VERSION >= Version("3.dev"),
                 reason=("Need to add pandas v3 support: "
                         "pandas tries to decode `data`, resulting in "
-                        "AttributeError: 'str' object has no attribute 'decode'")
+                        "AttributeError: 'str' object has no attribute 'decode'"),
+                strict=False,
             )
 def test_utf8():
     """Test bytes representing utf-8 string."""

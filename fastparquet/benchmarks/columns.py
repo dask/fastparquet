@@ -69,6 +69,9 @@ def time_column():
                 d.loc[n//2, col] = np.nan
             elif d.dtypes[col].kind in ['i', 'u']:
                 continue
+            elif d.dtypes[col].kind == "b":
+                d[col] = d[col].astype("boolean")
+                d.loc[n // 2, col] = pd.NA
             else:
                 d.loc[n//2, col] = None
             with measure('%s: write, with null, has_null=True' % d.dtypes[col], result):
