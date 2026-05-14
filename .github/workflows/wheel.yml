@@ -10,11 +10,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04]
+        os: [ubuntu-24.04]
         architecture: ['x64']
         include:
           # https://cibuildwheel.readthedocs.io/en/stable/options/#build-skip
-          - os: ubuntu-22.04
+          - os: ubuntu-24.04
             linux_archs: "aarch64"
     name: ${{ matrix.os }} ${{ matrix.architecture }} ${{ matrix.linux_archs }}
     env:
@@ -42,7 +42,7 @@ jobs:
 
       - name: Add msbuild to PATH
         if: runner.os == 'Windows'
-        uses: microsoft/setup-msbuild@v2
+        uses: microsoft/setup-msbuild@v3
 
       - name: delvewheel install
         if: runner.os == 'Windows'
@@ -50,7 +50,7 @@ jobs:
           python -m pip install delvewheel cython
 
       - name: Build wheels
-        uses: joerick/cibuildwheel@v3.3.0
+        uses: joerick/cibuildwheel@v3.4.1
 
       - name: list output
         run: ls ./wheelhouse/*.whl
@@ -66,11 +66,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04]
+        os: [ubuntu-24.04]
         architecture: ['x64']
         include:
           # https://cibuildwheel.readthedocs.io/en/stable/options/#build-skip
-          - os: ubuntu-22.04
+          - os: ubuntu-24.04
             linux_archs: "i686"
             skip: "pp*"
 
@@ -100,7 +100,7 @@ jobs:
 
       - name: Add msbuild to PATH
         if: runner.os == 'Windows'
-        uses: microsoft/setup-msbuild@v2
+        uses: microsoft/setup-msbuild@v3
 
       - name: delvewheel install
         if: runner.os == 'Windows'
@@ -108,7 +108,7 @@ jobs:
           python -m pip install delvewheel cython
 
       - name: Build wheels
-        uses: joerick/cibuildwheel@v3.3.0
+        uses: joerick/cibuildwheel@v3.4.1
 
       - name: list output
         run: ls ./wheelhouse/*.whl
@@ -124,11 +124,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04]
+        os: [ubuntu-24.04]
         architecture: ['x64']
         include:
           # https://cibuildwheel.readthedocs.io/en/stable/options/#build-skip
-          - os: ubuntu-22.04
+          - os: ubuntu-24.04
             linux_archs: "x86_64"
             skip: "pp*"
 
@@ -158,7 +158,7 @@ jobs:
 
       - name: Add msbuild to PATH
         if: runner.os == 'Windows'
-        uses: microsoft/setup-msbuild@v2
+        uses: microsoft/setup-msbuild@v3
 
       - name: delvewheel install
         if: runner.os == 'Windows'
@@ -166,7 +166,7 @@ jobs:
           python -m pip install delvewheel cython
 
       - name: Build wheels
-        uses: joerick/cibuildwheel@v3.3.0
+        uses: joerick/cibuildwheel@v3.4.1
 
       - name: list output
         run: ls ./wheelhouse/*.whl
@@ -216,7 +216,7 @@ jobs:
 
         - name: Add msbuild to PATH
           if: runner.os == 'Windows'
-          uses: microsoft/setup-msbuild@v2
+          uses: microsoft/setup-msbuild@v3
 
         - name: delvewheel install
           if: runner.os == 'Windows'
@@ -224,7 +224,7 @@ jobs:
             python -m pip install delvewheel cython
 
         - name: Build wheels
-          uses: joerick/cibuildwheel@v3.3.0
+          uses: joerick/cibuildwheel@v3.4.1
 
         - name: list output
           run: ls ./wheelhouse/*.whl
@@ -261,7 +261,7 @@ jobs:
           python-version: "3.13"
 
       - name: Build wheels
-        uses: joerick/cibuildwheel@v3.3.0
+        uses: joerick/cibuildwheel@v3.4.1
 
       - name: list output
         run: ls ./wheelhouse/*.whl
