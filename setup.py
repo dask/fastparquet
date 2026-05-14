@@ -38,8 +38,11 @@ else:
         def fix_exts(sources):
             return [s.replace('.pyx', '.c') for s in sources]
 
+    import platform
+    _machine = platform.machine()
+    _march = ['-march=x86-64-v2'] if _machine == 'x86_64' else []
     modules = [
-        Extension(mod, fix_exts(sources), extra_compile_args=['-O3', '-march=native'])
+        Extension(mod, fix_exts(sources), extra_compile_args=['-O3'] + _march)
         for mod, sources in modules_to_build.items()]
     extra = {'ext_modules': cythonize(modules, language_level=3)}
 
