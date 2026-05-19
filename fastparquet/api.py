@@ -845,17 +845,19 @@ selection does not match number of rows in DataFrame.')
             for col, parts in arrow_string_columns.items():
                 if not parts:
                     continue
-                final_arr = _pa.concat_arrays(parts)
+                final_arr = _pa.chunked_array(parts)
                 if len(final_arr) != len(df):
                     # Schema evolution: column absent in some row groups.  The
                     # pre-allocated object array already has None for the missing
                     # rows; skip the arrow conversion so callers see partial data.
                     continue
-                arrow_str = pd.arrays.ArrowStringArray(_pa.chunked_array([final_arr]))
+                arrow_str = pd.arrays.ArrowStringArray(
+                    final_arr, dtype=pd.StringDtype("pyarrow", na_value=np.nan)
+                )
                 if col in df.columns:
-                    df[col] = pd.Series(arrow_str, index=df.index, name=col)
+                    df[col] = pd.Series(arrow_str, index=df.index, name=col, copy=False)
                 elif col == df.index.name:
-                    df.index = pd.Index(arrow_str, name=col)
+                    df.index = pd.Index(arrow_str, name=col, copy=False)
 
         return df
 
