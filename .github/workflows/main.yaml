@@ -33,11 +33,10 @@ jobs:
         with:
           environment-file: ci/environment-${{ matrix.CONDA_ENV }}.yml
 
-      - name: pip-install
+      - name: build-ext
         shell: bash -l {0}
         run: |
           python setup.py build_ext --inplace
-          pip install -e . --no-deps --no-build-isolation
 
       - name: Run Tests
         shell: bash -l {0}
@@ -70,11 +69,10 @@ jobs:
         with:
           environment-file: ci/environment-${{ matrix.CONDA_ENV }}-pandas3.yml
 
-      - name: pip-install
+      - name: build-ext
         shell: bash -l {0}
         run: |
           python setup.py build_ext --inplace
-          pip install -e . --no-deps --no-build-isolation
 
       - name: Run Tests
         shell: bash -l {0}
@@ -107,11 +105,10 @@ jobs:
         with:
           environment-file: ci/environment-${{ matrix.CONDA_ENV }}.yml
 
-      - name: pip-install
+      - name: build-ext
         shell: bash -l {0}
         run: |
           python setup.py build_ext --inplace
-          pip install -e . --no-deps --no-build-isolation
 
       - name: Run Tests
         shell: bash -l {0}
@@ -157,7 +154,6 @@ jobs:
           pip install pytest-localserver pytest-xdist pytest-asyncio
           pip install meson-python versioneer # Needed for pandas build
           python setup.py build_ext --inplace
-          pip install -e . --no-deps --no-build-isolation # Install fastparquet
           pip install ./pandas --no-build-isolation -C compile-args="-j4"
 
       - name: Run Tests
@@ -188,11 +184,10 @@ jobs:
         with:
           environment-file: ci/environment-py310win.yml
 
-      - name: pip-install
+      - name: build-ext
         shell: bash -l {0}
         run: |
           python setup.py build_ext --inplace
-          pip install -e . --no-deps --no-build-isolation
 
       - name: Run Tests
         shell: bash -l {0}
