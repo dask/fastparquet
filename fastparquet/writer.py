@@ -218,6 +218,9 @@ def find_type(data, fixed_text=None, object_encoding=None, times='int64',
         type, converted_type, width = (parquet_thrift.Type.BYTE_ARRAY,
                                        parquet_thrift.ConvertedType.UTF8,
                                        None)
+        if fixed_text:
+            width = fixed_text
+            type = parquet_thrift.Type.FIXED_LEN_BYTE_ARRAY
     else:
         raise ValueError("Don't know how to convert data type: %s" % dtype)
     se = parquet_thrift.SchemaElement(
@@ -304,8 +307,12 @@ def convert(data, se):
         if data.dtype == "m8[ns]":
             out = np.empty(len(data), 'int64')
             time_shift(data.values.view('int64'), out)
+        elif data.dtype == "m8[ms]":
+            # convert ms -> us (multiply by 1000), preserving NaT
+            raw = data.values.view('int64')
+            out = np.where(raw == nat, nat, raw * 1000).astype('int64')
         else:
-            # assuming ms or us
+            # us: store as-is
             out = data.values
     elif type == parquet_thrift.Type.INT96 and dtype.kind == 'M':
         ns_per_day = (24 * 3600 * 1000000000)
@@ -921,7 +928,7 @@ def make_metadata(data, has_nulls=True, ignore_columns=None, fixed_text=None,
                                  is_index=is_index)
         col_has_nulls = has_nulls
         if has_nulls is None:
-            se.repetition_type = data[column].dtype == "O"
+            se.repetition_type = data[column].dtype == "O" or "str" in str(data[column].dtype)
         elif has_nulls is not True and has_nulls is not False:
             col_has_nulls = column in has_nulls
         if col_has_nulls:

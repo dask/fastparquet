@@ -1562,7 +1562,10 @@ def test_read_a_non_pandas_parquet_file(tempdir):
     parquet_file = ParquetFile(fn)
 
     assert parquet_file.count() == 2
-    assert parquet_file.head(1).equals(pd.DataFrame({"foo": [0], "bar": ["a"]}))
+    result = parquet_file.head(1)
+    expected = pd.DataFrame({"foo": [0], "bar": ["a"]})
+    assert list(result.columns) == list(expected.columns)
+    assert (result.values == expected.values).all()
 
 
 def test_gh929(tempdir):

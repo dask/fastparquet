@@ -36,7 +36,7 @@ jobs:
       - name: pip-install
         shell: bash -l {0}
         run: |
-          pip install . --no-deps
+          pip install -e . --no-deps --no-build-isolation
 
       - name: Run Tests
         shell: bash -l {0}
@@ -72,7 +72,7 @@ jobs:
       - name: pip-install
         shell: bash -l {0}
         run: |
-          pip install . --no-deps
+          pip install -e . --no-deps --no-build-isolation
 
       - name: Run Tests
         shell: bash -l {0}
@@ -108,7 +108,7 @@ jobs:
       - name: pip-install
         shell: bash -l {0}
         run: |
-          pip install . --no-deps
+          pip install -e . --no-deps --no-build-isolation
 
       - name: Run Tests
         shell: bash -l {0}
@@ -153,7 +153,7 @@ jobs:
           pip install hypothesis
           pip install pytest-localserver pytest-xdist pytest-asyncio
           pip install meson-python versioneer # Needed for pandas build
-          pip install . --no-deps # Install fastparquet
+          pip install -e . --no-deps --no-build-isolation # Install fastparquet
           pip install ./pandas --no-build-isolation -C compile-args="-j4"
 
       - name: Run Tests
@@ -187,7 +187,7 @@ jobs:
       - name: pip-install
         shell: bash -l {0}
         run: |
-          pip install . --no-deps
+          pip install -e . --no-deps --no-build-isolation
 
       - name: Run Tests
         shell: bash -l {0}

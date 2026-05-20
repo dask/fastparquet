@@ -12,6 +12,7 @@ dependencies:
   - pytest-cov
   - thrift
   - numpy
+  - cython
   - cramjam
   - pyspark=3.3
   - packaging

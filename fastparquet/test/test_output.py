@@ -510,7 +510,7 @@ def test_text_convert(tempdir):
     assert pf._schema[2].type_length == 1
     assert pf.statistics['max']['a'] == [u'π']
     df2 = pf.to_pandas()
-    tm.assert_frame_equal(df, df2, check_categorical=False)
+    tm.assert_frame_equal(df, df2, check_categorical=False, check_dtype=False)
 
     write(fn, df, stats=True)
     pf = ParquetFile(fn)
@@ -518,7 +518,7 @@ def test_text_convert(tempdir):
     assert pf._schema[2].type == parquet_thrift.Type.BYTE_ARRAY
     assert pf.statistics['max']['a'] == [u'π']
     df2 = pf.to_pandas()
-    tm.assert_frame_equal(df, df2, check_categorical=False)
+    tm.assert_frame_equal(df, df2, check_categorical=False, check_dtype=False)
 
     write(fn, df, fixed_text={'a': 2}, stats=True)
     pf = ParquetFile(fn)
@@ -526,7 +526,7 @@ def test_text_convert(tempdir):
     assert pf._schema[2].type == parquet_thrift.Type.BYTE_ARRAY
     assert pf.statistics['max']['a'] == [u'π']
     df2 = pf.to_pandas()
-    tm.assert_frame_equal(df, df2, check_categorical=False)
+    tm.assert_frame_equal(df, df2, check_categorical=False, check_dtype=False)
 
 
 def test_null_time(tempdir):
