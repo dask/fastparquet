@@ -497,11 +497,6 @@ def test_naive_index(tempdir):
 
     assert set(r.columns) == {'x', 'y', 'index'}
 
-@pytest.mark.xfail(
-                PANDAS_VERSION >= Version("3.dev"),
-                reason=("Need to add pandas v3 support: "
-                        "`.to_pandas()` needs to convert to pd.StringDtype()")
-            )
 def test_text_convert(tempdir):
     df = pd.DataFrame({'a': [u'π'] * 100,
                        'b': [b'a'] * 100})
@@ -555,11 +550,6 @@ def test_null_time(tempdir):
     assert sum(data['t'].isnull()) == sum(expected['t'].isnull())
 
 
-@pytest.mark.xfail(
-                PANDAS_VERSION >= Version("3.dev"),
-                reason=("Need to add pandas v3 support: "
-                        "`.to_pandas()` needs to convert to pd.StringDtype()")
-            )
 def test_auto_null_object(tempdir):
     tmp = str(tempdir)
     df = pd.DataFrame({'a': [1, 2, 3, 0],
@@ -807,11 +797,6 @@ def test_append_fail(tempdir):
     assert 'existing file scheme' in str(e.value)
 
 
-@pytest.mark.xfail(
-                PANDAS_VERSION >= Version("3.dev"),
-                reason=("Need to add pandas v3 support: "
-                        "`.to_pandas()` needs to convert to pd.StringDtype()")
-            )
 def test_append_fail_incompatible(tempdir):
     fn = os.path.join(str(tempdir), 'test.parq')
     df1 = pd.DataFrame({'a': [1, 2, 3, 0],
@@ -1032,7 +1017,10 @@ def test_empty_columns(tempdir):
     write(fn, df, stats=False)
     pf = ParquetFile(fn)
     out = pf.to_pandas()
-    assert out.iloc[0].to_dict() == {'a': None, 'b': 'a', 'c': b'a', 'd': b'', 'aa': None, 'bb': 'a'}
+    if PANDAS_VERSION >= Version("3"):
+        assert out.iloc[0].to_dict() == {'a': None, 'b': 'a', 'c': b'a', 'd': b'', 'aa': np.nan, 'bb': 'a'}
+    else:
+        assert out.iloc[0].to_dict() == {'a': None, 'b': 'a', 'c': b'a', 'd': b'', 'aa': None, 'bb': 'a'}
 
 
 def test_no_string(tmpdir):
