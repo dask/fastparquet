@@ -14,8 +14,11 @@ class build_ext(_build_ext):
         _build_ext.finalize_options(self)
         # Prevent numpy from thinking it is still in its setup process:
         builtins.__NUMPY_SETUP__ = False
-        import numpy
-        self.include_dirs.append(numpy.get_include())
+        try:
+            import numpy
+            self.include_dirs.append(numpy.get_include())
+        except ImportError:
+            pass  # numpy not needed for metadata-only operations (dist_info/egg_info)
 
 
 allowed = ('--help-commands', '--version', 'egg_info', 'clean')
