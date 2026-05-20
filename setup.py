@@ -43,7 +43,15 @@ else:
 
     import platform
     _machine = platform.machine()
-    _march = ['-march=x86-64-v2'] if _machine == 'x86_64' else []
+    if _machine == 'x86_64':
+        # x86-64-v2 requires GCC >= 11; probe before using it
+        probe = subprocess.run(
+            ['cc', '-march=x86-64-v2', '-x', 'c', '-', '-fsyntax-only'],
+            input=b'', capture_output=True
+        )
+        _march = ['-march=x86-64-v2'] if probe.returncode == 0 else []
+    else:
+        _march = []
     modules = [
         Extension(mod, fix_exts(sources), extra_compile_args=['-O3'] + _march)
         for mod, sources in modules_to_build.items()]
