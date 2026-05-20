@@ -131,11 +131,6 @@ def test_timestamps():
     assert str(df.t2.dt.tz) == z2
 
 
-@pytest.mark.xfail(
-                PANDAS_VERSION >= Version("3.dev"),
-                reason=("Need to add pandas v3 support: "
-                        "Add support to pd.StringDtype()")
-            )
 def test_pandas_hive_serialization(tmpdir):
     parquet_dir = tmpdir.join("test.par")
     column = "data"

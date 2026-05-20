@@ -3,6 +3,8 @@ channels:
   - conda-forge
 dependencies:
   - python=3.11
+  - pip
+  - setuptools
   - bson
   - lz4
   - lzo
@@ -12,6 +14,7 @@ dependencies:
   - pytest-cov
   - thrift
   - numpy
+  - cython
   - cramjam
   - pyspark=3.3
   - packaging

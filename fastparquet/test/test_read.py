@@ -567,11 +567,6 @@ def test_column_multiindex_roundtrip(tempdir):
     assert df.equals(out)
 
 
-@pytest.mark.xfail(
-    PANDAS_VERSION >= Version("3.dev"),
-    reason="Need to add pandas v3 support: problem casting ms to s due to overflow",
-    strict=False,
-)
 def test_sparse_column_multiindex_no_row_index(tempdir):
     ts = [pd.Timestamp('2021/01/01 08:00:00'),
           pd.Timestamp('2021/01/05 10:00:00')]

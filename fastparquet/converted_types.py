@@ -210,11 +210,17 @@ def convert(data, se, timestamp96=True, dtype=None):
         # this was not covered by new pandas time units
         data = data.astype('int64')
         time_shift(data, 1000000)
-        return data.view('timedelta64[ns]')
+        result = data.view('timedelta64[ns]')
+        if dtype is not None and hasattr(dtype, 'kind') and dtype.kind == 'm' and dtype != result.dtype:
+            return result.astype(dtype, casting='unsafe')
+        return result
     elif ctype == parquet_thrift.ConvertedType.TIMESTAMP_MILLIS:
         return data.view('datetime64[ms]')
     elif ctype == parquet_thrift.ConvertedType.TIME_MICROS:
-        return data.view('timedelta64[us]')
+        result = data.view('timedelta64[us]')
+        if dtype is not None and hasattr(dtype, 'kind') and dtype.kind == 'm' and dtype != result.dtype:
+            return result.astype(dtype, casting='unsafe')
+        return result
     elif ctype == parquet_thrift.ConvertedType.TIMESTAMP_MICROS:
         return data.view('datetime64[us]')
     elif ctype == parquet_thrift.ConvertedType.UINT_8:
