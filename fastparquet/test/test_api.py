@@ -992,7 +992,7 @@ def test_multi_cat_single(tempdir):
     write(fn, df)
     pf = ParquetFile(fn)
     df1 = pf.to_pandas()
-    assert df1.equals(df)
+    pd.testing.assert_frame_equal(df1, df)
 
 
 def test_multi_cat_split(tempdir):
@@ -1049,7 +1049,7 @@ def test_multi_dtype(tempdir):
 
     pf = fastparquet.ParquetFile(fn)
     df2 = pf.to_pandas()
-    assert df.equals(df2)
+    pd.testing.assert_frame_equal(df2, df)
 
 
 def test_simple_nested():
