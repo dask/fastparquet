@@ -598,6 +598,57 @@ def test_auto_null_object(tempdir):
     tm.assert_frame_equal(df[['aaa']].astype('int64'), df2[['aaa']])
 
 
+@pytest.mark.parametrize('remainder', (1, 2, 3))
+@pytest.mark.parametrize('datapage_version', (1, 2))
+def test_dict_encoding_padding(tempdir, remainder, datapage_version, monkeypatch):
+    """Regression test for GH#979.
+
+    When Ncat > 128 the backing dtype is int16 (bit_width=16).  The RLE
+    bit-packed run header declares ceil(N/8) groups of 8 values; each group
+    must occupy exactly 8 * itemsize bytes.  When N % 8 is in {1,2,3} the last
+    group is partial and the missing slots must be zero-padded.  Without the
+    fix, strict readers (e.g. Apache Spark) overrun the page buffer.
+    Both V1 and V2 data pages are exercised here.
+    """
+    if datapage_version == 2:
+        monkeypatch.setenv("FASTPARQUET_DATAPAGE_V2", "1")
+    else:
+        monkeypatch.delenv("FASTPARQUET_DATAPAGE_V2", raising=False)
+    monkeypatch.setattr(writer, "DATAPAGE_VERSION", datapage_version)
+
+    categories = [f"CAT_{i:04d}" for i in range(490)]  # 490 cats → int16 codes
+    # Choose num_values so that num_values % 8 == remainder
+    num_values = 496 + remainder  # 497, 498 or 499
+    rng = np.random.default_rng(42)
+    df = pd.DataFrame({
+        'col': pd.Categorical(
+            rng.choice(categories, num_values),
+            categories=categories,
+        )
+    })
+    fn = os.path.join(str(tempdir), "test_padding.parq")
+    write(fn, df, has_nulls=False)
+    out = ParquetFile(fn).to_pandas()
+    tm.assert_frame_equal(df, out, check_categorical=False, check_dtype=False)
+
+    if datapage_version == 1:
+        # Verify the encoded page size is a multiple of 8 * itemsize (16 bytes per group)
+        encoded = writer.encode_dict(df['col'].cat.codes, None)
+        # First byte is bit_width; next byte(s) are the varint run header; rest is data+padding
+        bit_width = encoded[0]
+        assert bit_width == 16
+        # Strip the header (bit_width byte + varint) to get the raw data+padding bytes
+        idx = 1
+        while encoded[idx] & 0x80:
+            idx += 1
+        idx += 1  # past the last varint byte
+        data_bytes = len(encoded) - idx
+        group_size = 8 * (bit_width // 8)  # 16 bytes per group
+        assert data_bytes % group_size == 0, (
+            f"data bytes ({data_bytes}) not a multiple of group_size ({group_size})"
+        )
+
+
 @pytest.mark.parametrize('n', (10, 127, 2**8 + 1, 2**16 + 1))
 def test_many_categories(tempdir, n):
     tmp = str(tempdir)
