@@ -354,8 +354,10 @@ def read_data_page_v2(infile, schema_helper, se, data_header2, cmd,
             pagefile.seek(4, 1)
         if bit_width in [8, 16, 32] and selfmade:
             # special fastpath for cats
-            outbytes = raw_bytes[pagefile.tell():]
-            if len(outbytes) == assign[num:num+data_header2.num_values].nbytes:
+            # Trim to exact byte length (ignore padding)
+            n_bytes = assign[num:num+data_header2.num_values].nbytes
+            outbytes = raw_bytes[pagefile.tell():pagefile.tell() + n_bytes]
+            if len(outbytes) == n_bytes:
                 assign[num:num+data_header2.num_values].view('uint8')[row_filter] = outbytes[row_filter]
             else:
                 if data_header2.num_nulls == 0:
