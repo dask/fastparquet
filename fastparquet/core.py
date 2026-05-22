@@ -256,19 +256,12 @@ def read_data_page_v2(infile, schema_helper, se, data_header2, cmd,
         bit_width = encoding.width_from_max_int(max_def)
         # not the same as read_data(), because we know the length
         io_obj = encoding.NumpyIO(infile.read(data_header2.definition_levels_byte_length))
-        if nullable:
-            defi = assign._mask
-        else:
-            # TODO: in tabular data, nulls arrays could be reused for each column
-            defi = np.empty(data_header2.num_values, dtype=np.uint8)
+        defi = np.empty(data_header2.num_values, dtype=np.uint8)
         encoding.read_rle_bit_packed_hybrid(io_obj, bit_width, data_header2.num_values,
                                             encoding.NumpyIO(defi), itemsize=1)
-        if max_rep:
-            # assemble_objects needs both arrays
-            nulls = defi != max_def
-        else:
-            np.not_equal(defi.view("uint8"), max_def, out=defi)
-            nulls = defi.view(np.bool_)
+        nulls = defi != max_def
+        if nullable:
+            np.not_equal(defi, max_def, out=assign._mask)
     infile.seek(data)
 
     # input and output element sizes match
@@ -343,7 +336,7 @@ def read_data_page_v2(infile, schema_helper, se, data_header2, cmd,
         # DICTIONARY or BOOL direct decode RLE into output (no nulls)
         codec = cmd.codec if data_header2.is_compressed else "UNCOMPRESSED"
         raw_bytes = np.frombuffer(infile.read(size), dtype='uint8')
-        raw_bytes = decompress_data(raw_bytes, uncompressed_page_size, codec)
+        raw_bytes = np.frombuffer(decompress_data(raw_bytes, uncompressed_page_size, codec), dtype='uint8')
         pagefile = encoding.NumpyIO(raw_bytes)
         if data_header2.encoding != parquet_thrift.Encoding.RLE:
             # TODO: check this bit; is the varint read only row byte-exact fastpath?
@@ -353,21 +346,20 @@ def read_data_page_v2(infile, schema_helper, se, data_header2, cmd,
             bit_width = 1
             pagefile.seek(4, 1)
         if bit_width in [8, 16, 32] and selfmade:
-            # special fastpath for cats
-            # Trim to exact byte length (ignore padding)
-            n_bytes = assign[num:num+data_header2.num_values].nbytes
-            outbytes = raw_bytes[pagefile.tell():pagefile.tell() + n_bytes]
-            if len(outbytes) == n_bytes:
-                assign[num:num+data_header2.num_values].view('uint8')[row_filter] = outbytes[row_filter]
-            else:
-                if data_header2.num_nulls == 0:
-                    assign[num:num+data_header2.num_values][row_filter] = outbytes[row_filter]
+            itemsize = bit_width // 8
+            code_bytes = raw_bytes[pagefile.tell():pagefile.tell() + n_values * itemsize]
+            codes = np.frombuffer(code_bytes, dtype='int%i' % bit_width)
+            if data_header2.num_nulls == 0:
+                if row_filter is Ellipsis:
+                    assign[num:num+data_header2.num_values] = codes
                 else:
-                    if row_filter is Ellipsis:
-                        assign[num:num+data_header2.num_values][~nulls] = outbytes
-                    else:
-                        assign[num:num + data_header2.num_values][~nulls[row_filter]] = outbytes[~nulls * row_filter]
-                    assign[num:num+data_header2.num_values][nulls[row_filter]] = -1
+                    assign[num:num+data_header2.num_values][row_filter] = codes[row_filter]
+            else:
+                if row_filter is Ellipsis:
+                    assign[num:num+data_header2.num_values][~nulls] = codes
+                else:
+                    assign[num:num+data_header2.num_values][~nulls[row_filter]] = codes[~nulls[row_filter]]
+                assign[num:num+data_header2.num_values][nulls[row_filter] if row_filter is not Ellipsis else nulls] = -1
         else:
             if data_header2.num_nulls == 0:
                 encoding.read_rle_bit_packed_hybrid(

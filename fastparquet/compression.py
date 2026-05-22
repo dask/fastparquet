@@ -9,7 +9,8 @@ compressions = {
     'UNCOMPRESSED': lambda x: x
 }
 decompressions = {
-    'UNCOMPRESSED': lambda x, y: x
+    # makes is writable, which cython likes
+    'UNCOMPRESSED': lambda x, y: cramjam.Buffer(x)  
 }
 
 # Gzip is present regardless
