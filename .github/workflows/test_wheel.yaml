@@ -63,7 +63,8 @@ jobs:
         shell: bash -l {0}
         run: |
           pip install "pandas<3"
-          pip install ./wheelhouse/*manylinux*.whl ./wheelhouse/*win*.whl
+          rm ./wheelhouse/*musl*
+          pip install ./wheelhouse/*.whl
 
       - name: Run Tests after installing numpy (${{matrix.numpy_version}})
         shell: bash -l {0}
