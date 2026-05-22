@@ -408,8 +408,14 @@ def encode_dict(data, _):
     o.write_byte(width)
     bit_packed_count = (len(data) + 7) // 8
     cencoding.encode_unsigned_varint(bit_packed_count << 1 | 1, o)  # write run header
-    # TODO: `bytes`, `tobytes` makes copy, and adding bytes also makes copy
-    return bytes(o.so_far()) + data.values.tobytes()
+
+    # When the last group is partial (i.e.
+    # len(data) % 8 != 0), the remaining slots must be zero-padded so that
+    # the total byte count matches what the header declares.
+    # https://github.com/dask/fastparquet/issues/979
+    raw = data.values.tobytes()
+    padding = bit_packed_count * 8 * data.values.dtype.itemsize - len(raw)
+    return b"".join((o.so_far(), raw, b'\x00' * padding))
 
 
 encode = {
