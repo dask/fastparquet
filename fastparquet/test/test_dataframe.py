@@ -132,7 +132,7 @@ def test_timestamps():
 
 
 def test_pandas_hive_serialization(tmpdir):
-    parquet_dir = tmpdir.join("test.par")
+    parquet_dir = str(tmpdir.join("test.par"))
     column = "data"
     df = pd.DataFrame(
         columns=[column], data=[("42",), ("",), ("0",), ("1",), ("0.0",)]
