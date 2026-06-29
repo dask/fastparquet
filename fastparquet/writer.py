@@ -27,7 +27,7 @@ from decimal import Decimal
 MARKER = b'PAR1'
 ROW_GROUP_SIZE = 50_000_000
 NaT = np.timedelta64(None).tobytes()  # require numpy version >= 1.7
-nat = np.datetime64('NaT').view('int64')
+nat = np.int64(-9223372036854775808)  # np.datetime64('NaT').view('int64')
 
 typemap = {  # primitive type, converted type, bit width
     'boolean': (parquet_thrift.Type.BOOLEAN, None, 1),
