@@ -34,7 +34,7 @@ except ImportError:  # pragma: no cover
 # Explicitly use numpy type in order to avoid promotion errors due to NEP 50 in numpy >= 2
 DAYS_TO_NANOS = np.int64(86400000000000)
 """Number of nanoseconds in a day. Used to convert a Date to a date"""
-nat = np.datetime64('NaT').view('int64')
+nat = np.int64(-9223372036854775808)  # np.datetime64('NaT').view('int64')
 
 simple = {
     parquet_thrift.Type.INT32: np.dtype('int32'),
