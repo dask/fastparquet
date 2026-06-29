@@ -160,9 +160,10 @@ jobs:
         shell: bash -l {0}
         run: |
           pytest -v  fastparquet/ # fastparquet test suite against dev pandas
-          pytest --verbose pandas/pandas/tests/io/test_parquet.py
+          cd pandas
+          pytest --verbose pandas/tests/io/test_parquet.py -o xfail_strict=False
           # Test parquet with different filesystems
-          pytest --verbose pandas/pandas/tests/io/test_gcs.py pandas/pandas/tests/io/test_fsspec.py -k "parquet" -o xfail_strict=False
+          pytest --verbose pandas/tests/io/test_gcs.py pandas/tests/io/test_fsspec.py -k "parquet" -o xfail_strict=False
 
   win:
     name: win
