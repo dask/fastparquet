@@ -160,9 +160,9 @@ jobs:
       - name: Run Tests
         shell: bash -l {0}
         run: |
-          pytest -v  fastparquet/ # fastparquet test suite against dev pandas
+          PY_IGNORE_IMPORTMISMATCH=1 pytest -v  fastparquet/ # fastparquet test suite against dev pandas
           cd pandas
-          pytest --verbose pandas/tests/io/test_parquet.py -o xfail_strict=False
+          PY_IGNORE_IMPORTMISMATCH=1 pytest --verbose pandas/tests/io/test_parquet.py -o xfail_strict=False
           # Test parquet with different filesystems
           PY_IGNORE_IMPORTMISMATCH=1 pytest --verbose pandas/tests/io/test_gcs.py pandas/tests/io/test_fsspec.py -k "parquet" -o xfail_strict=False
 
