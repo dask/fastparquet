@@ -154,6 +154,7 @@ jobs:
           pip install pytest-localserver pytest-xdist pytest-asyncio
           pip install meson-python versioneer # Needed for pandas build
           python setup.py build_ext --inplace
+          pip uninstall pandas  # remove site-packages version
           python -m pip install ./pandas --no-build-isolation -C compile-args="-j4"
 
       - name: Run Tests
