@@ -36,6 +36,12 @@ def _read_page(file_obj, page_header, column_metadata):
 
 
 def read_data(fobj, coding, count, bit_width, out=None):
+    # Security clamp: bit_width is file-controlled (column type_length) and can be
+    # huge, overflowing the cencoding decode (boundscheck=False). Base cells are <=64
+    # bits; bound it here to prevent the OOB read/write reachable from crafted parquet
+    # (see SECURITY: dask/fastparquet#985).
+    if not (isinstance(bit_width, int) and 1 <= bit_width <= 64):
+        bit_width = 64
     """For definition and repetition levels
 
     Reads with RLE/bitpacked hybrid, where length is given by first byte.
