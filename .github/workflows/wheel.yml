@@ -188,6 +188,11 @@ jobs:
           # https://cibuildwheel.readthedocs.io/en/stable/options/#build-skip
           - os: windows-latest
             skip: ""
+          - os: windows-11-arm
+            architecture: 'arm64'
+            # cp310: NumPy has no win_arm64 wheel for Python 3.10 and its
+            # source build fails in the isolated build environment
+            skip: "cp310-*"
 
     name: ${{ matrix.os }} ${{ matrix.architecture}}
     env:
