@@ -1602,3 +1602,17 @@ def test_auto_string(tempdir, pandas_string):
     df.to_parquet(fn, engine="fastparquet")
 
 
+
+
+def test_string_dictionary_fallback_to_plain(tempdir):
+    # GH#993: a column chunk with dictionary pages followed by plain pages
+    # read the plain pages' rows as nulls
+    pa = pytest.importorskip("pyarrow")
+    pq = pytest.importorskip("pyarrow.parquet")
+    fn = f"{tempdir}/fallback.parquet"
+    strings = [f"https://example.org/{i:08d}/file-{i:08d}.nc" for i in range(5000)]
+    pq.write_table(pa.table({"s": strings}), fn, dictionary_pagesize_limit=1024)
+    encodings = pq.ParquetFile(fn).metadata.row_group(0).column(0).encodings
+    assert "PLAIN" in encodings and "RLE_DICTIONARY" in encodings
+    out = ParquetFile(fn).to_pandas()["s"]
+    assert out.tolist() == strings
