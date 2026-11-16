@@ -529,6 +529,20 @@ def test_text_convert(tempdir):
     tm.assert_frame_equal(df, df2, check_categorical=False, check_dtype=False)
 
 
+@pytest.mark.parametrize("has_nulls", [False, True])
+def test_second_resolution_times_roundtrip(tempdir, has_nulls):
+    # GH#992
+    fn = os.path.join(str(tempdir), "test.parquet")
+    df = pd.DataFrame({
+        "d": pd.to_datetime(["2025-01-05 01:02:03", None]).astype("datetime64[s]"),
+        "t": pd.to_timedelta([90061, None], unit="s").astype("timedelta64[s]"),
+    })
+    write(fn, df, has_nulls=has_nulls)
+    out = ParquetFile(fn).to_pandas()
+    assert out["d"].tolist() == df["d"].tolist()
+    assert out["t"].tolist() == df["t"].tolist()
+
+
 def test_null_time(tempdir):
     """Test reading a file that contains null records."""
     tmp = str(tempdir)
