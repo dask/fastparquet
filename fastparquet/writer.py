@@ -307,10 +307,11 @@ def convert(data, se):
         if data.dtype == "m8[ns]":
             out = np.empty(len(data), 'int64')
             time_shift(data.values.view('int64'), out)
-        elif data.dtype == "m8[ms]":
-            # convert ms -> us (multiply by 1000), preserving NaT
+        elif data.dtype in ("m8[ms]", "m8[s]"):
+            # convert to us, preserving NaT
             raw = data.values.view('int64')
-            out = np.where(raw == nat, nat, raw * 1000).astype('int64')
+            scale = 1000 if data.dtype == "m8[ms]" else 1000000
+            out = np.where(raw == nat, nat, raw * scale).astype('int64')
         else:
             # us: store as-is
             out = data.values
@@ -323,6 +324,10 @@ def convert(data, se):
         out['day'] = day
     elif dtype.kind == "M":
         part = str(dtype).split("[")[1][:-1].split(",")[0]
+        if part == "s":
+            # stored as ms, preserving NaT
+            raw = data.values.view("int64")
+            return np.where(raw == nat, nat, raw * 1000)
         if converted_type:
             factor = time_factors[(converted_type, part)]
         else:
@@ -339,7 +344,6 @@ time_factors = {
     (parquet_thrift.ConvertedType.TIMESTAMP_MICROS, "us"): 1,
     (parquet_thrift.ConvertedType.TIMESTAMP_MICROS, "ns"): 1000,
     (parquet_thrift.ConvertedType.TIMESTAMP_MILLIS, "ms"): 1,
-    (parquet_thrift.ConvertedType.TIMESTAMP_MILLIS, "s"): 1000,
 }
 
 
