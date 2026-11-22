@@ -98,7 +98,9 @@ def test_groupby_types():
 
 
 def test_bad_tz():
-    idx = pd.date_range('2012-01-01', periods=3, tz='dateutil/Europe/London')
+    # Empty, so pandas never localizes a value: with python-dateutil 4,
+    # pandas 2.x cannot localize to a dateutil zone at all.
+    idx = pd.DatetimeIndex([], tz='dateutil/Europe/London')
     with pytest.raises(ValueError):
         get_column_metadata(idx, 'tz')
 
