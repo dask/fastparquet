@@ -13,7 +13,9 @@ decompressions = {
     'UNCOMPRESSED': lambda x, y: cramjam.Buffer(x)  
 }
 
-# Gzip is present regardless
+# Some distributions build cramjam without some of its codecs (e.g. gzip), so
+# each codec is only registered when cramjam provides it; using a codec that is
+# missing then fails with the "not available" error below, not on import.
 COMPRESSION_LEVEL = 6
 
 
@@ -25,10 +27,16 @@ def gzip_decompress(data, uncompressed_size):
     return cramjam.gzip.decompress(data, output_len=uncompressed_size)
 
 
-compressions['GZIP'] = gzip_compress_v3
-decompressions['GZIP'] = gzip_decompress
-compressions['SNAPPY'] = cramjam.snappy.compress_raw
-decompressions['SNAPPY'] = cramjam.snappy.decompress_raw
+decom_into = {}
+
+if hasattr(cramjam, "gzip"):
+    compressions['GZIP'] = gzip_compress_v3
+    decompressions['GZIP'] = gzip_decompress
+    decom_into["GZIP"] = cramjam.gzip.decompress_into
+if hasattr(cramjam, "snappy"):
+    compressions['SNAPPY'] = cramjam.snappy.compress_raw
+    decompressions['SNAPPY'] = cramjam.snappy.decompress_raw
+    decom_into["SNAPPY"] = cramjam.snappy.decompress_raw_into
 
 try:
     import lzo
@@ -38,8 +46,10 @@ try:
     decompressions['LZO'] = lzo_decompress
 except ImportError:
     pass
-compressions['BROTLI'] = cramjam.brotli.compress
-decompressions['BROTLI'] = cramjam.brotli.decompress
+if hasattr(cramjam, "brotli"):
+    compressions['BROTLI'] = cramjam.brotli.compress
+    decompressions['BROTLI'] = cramjam.brotli.decompress
+    decom_into["BROTLI"] = cramjam.brotli.decompress_into
 
 
 def lz4_compress(data, **kwargs):
@@ -51,21 +61,18 @@ def lz4_decomp(data, size):
     return cramjam.lz4.decompress_block(np.frombuffer(data, 'uint8'), size)
 
 
-compressions['LZ4'] = lz4_compress
-decompressions['LZ4'] = lz4_decomp
+if hasattr(cramjam, "lz4"):
+    compressions['LZ4'] = lz4_compress
+    decompressions['LZ4'] = lz4_decomp
 
-# LZ4 is actually LZ4 block, aka "raw", see
-# https://github.com/apache/parquet-format/commit/7f06e838cbd1b7dbd722ff2580b9c2525e37fc46
-compressions['LZ4_RAW'] = lz4_compress
-decompressions['LZ4_RAW'] = lz4_decomp
-compressions['ZSTD'] = cramjam.zstd.compress
-decompressions['ZSTD'] = cramjam.zstd.decompress
-decom_into = {
-    "GZIP": cramjam.gzip.decompress_into,
-    "SNAPPY": cramjam.snappy.decompress_raw_into,
-    "ZSTD": cramjam.zstd.decompress_into,
-    "BROTLI": cramjam.brotli.decompress_into
-}
+    # LZ4 is actually LZ4 block, aka "raw", see
+    # https://github.com/apache/parquet-format/commit/7f06e838cbd1b7dbd722ff2580b9c2525e37fc46
+    compressions['LZ4_RAW'] = lz4_compress
+    decompressions['LZ4_RAW'] = lz4_decomp
+if hasattr(cramjam, "zstd"):
+    compressions['ZSTD'] = cramjam.zstd.compress
+    decompressions['ZSTD'] = cramjam.zstd.decompress
+    decom_into["ZSTD"] = cramjam.zstd.decompress_into
 
 compressions = {k.upper(): v for k, v in compressions.items()}
 decompressions = {k.upper(): v for k, v in decompressions.items()}
