@@ -82,3 +82,22 @@ def test_not_installed():
     with pytest.raises(RuntimeError) as e:
         compress_data(b'123', compression=4)
     assert 'brotli' in str(e.value).lower()
+
+
+def test_import_without_cramjam_gzip(monkeypatch):
+    # some distributions build cramjam without gzip; importing fastparquet must still work
+    import importlib
+    import cramjam
+    from fastparquet import compression
+
+    monkeypatch.delattr(cramjam, "gzip")
+    try:
+        importlib.reload(compression)
+        assert "GZIP" not in compression.compressions
+        assert "GZIP" not in compression.decompressions
+        assert "SNAPPY" in compression.compressions
+        with pytest.raises(RuntimeError, match="not available"):
+            compression.compress_data(b"123", compression="gzip")
+    finally:
+        monkeypatch.undo()
+        importlib.reload(compression)
