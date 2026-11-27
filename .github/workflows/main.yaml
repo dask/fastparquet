@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        CONDA_ENV: [py310, py311, py312, py313, py314]
+        CONDA_ENV: [py311, py312, py313, py314]
     steps:
       - name: APT
         run: sudo apt-get install liblzo2-dev
@@ -85,7 +85,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        CONDA_ENV: [py310]
+        CONDA_ENV: [py314]
     steps:
       - name: APT
         run: sudo apt-get install liblzo2-dev
@@ -184,7 +184,7 @@ jobs:
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v3
         with:
-          environment-file: ci/environment-py310win.yml
+          environment-file: ci/environment-py312win.yml
 
       - name: build-ext
         shell: bash -l {0}

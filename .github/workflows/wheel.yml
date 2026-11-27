@@ -49,8 +49,11 @@ jobs:
         run: |
           python -m pip install delvewheel cython
 
+      - name: Install cibuildwheel
+        run: python -m pip install cibuildwheel==4.3.5
+
       - name: Build wheels
-        uses: joerick/cibuildwheel@v3.4.1
+        run: python -m cibuildwheel --output-dir wheelhouse
 
       - name: list output
         run: ls ./wheelhouse/*.whl
@@ -107,8 +110,11 @@ jobs:
         run: |
           python -m pip install delvewheel cython
 
+      - name: Install cibuildwheel
+        run: python -m pip install cibuildwheel==4.3.5
+
       - name: Build wheels
-        uses: joerick/cibuildwheel@v3.4.1
+        run: python -m cibuildwheel --output-dir wheelhouse
 
       - name: list output
         run: ls ./wheelhouse/*.whl
@@ -165,8 +171,11 @@ jobs:
         run: |
           python -m pip install delvewheel cython
 
+      - name: Install cibuildwheel
+        run: python -m pip install cibuildwheel==4.3.5
+
       - name: Build wheels
-        uses: joerick/cibuildwheel@v3.4.1
+        run: python -m cibuildwheel --output-dir wheelhouse
 
       - name: list output
         run: ls ./wheelhouse/*.whl
@@ -228,8 +237,11 @@ jobs:
           run: |
             python -m pip install delvewheel cython
 
+        - name: Install cibuildwheel
+          run: python -m pip install cibuildwheel==4.3.5
+
         - name: Build wheels
-          uses: joerick/cibuildwheel@v3.4.1
+          run: python -m cibuildwheel --output-dir wheelhouse
 
         - name: list output
           run: ls ./wheelhouse/*.whl
@@ -265,8 +277,11 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Install cibuildwheel
+        run: python -m pip install cibuildwheel==4.3.5
+
       - name: Build wheels
-        uses: joerick/cibuildwheel@v3.4.1
+        run: python -m cibuildwheel --output-dir wheelhouse
 
       - name: list output
         run: ls ./wheelhouse/*.whl

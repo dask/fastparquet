@@ -15,7 +15,9 @@ dependencies:
   - numpy
   - cython
   - cramjam
+  - pyspark
   - packaging
   - orjson
   - ujson
   - python-rapidjson
+  - pyarrow

@@ -15,10 +15,6 @@ jobs:
         numpy_version: ["numpy#latest"]
         include:
           # https://cibuildwheel.readthedocs.io/en/stable/options/#build-skip
-          - os: windows-2022
-            skip: "*2*win* *win32 pp*"
-          - os: windows-11-arm
-            skip: "*win32 pp*"
           - os: ubuntu-22.04
             linux_archs: native
             skip: "pp* *musl*"
