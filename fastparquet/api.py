@@ -806,16 +806,26 @@ selection does not match number of rows in DataFrame.')
                     for col in df.columns:
                         if col not in rg_cols:
                             _schema_evo_cols.add(col)
+            # Dictionary-encoded pages are decoded into the object array, not
+            # into arrow parts, so a column with any of them (such as one that
+            # falls back from dictionary to plain pages) must stay on that path.
+            _dict_encodings = {parquet_thrift.Encoding.PLAIN_DICTIONARY,
+                               parquet_thrift.Encoding.RLE_DICTIONARY}
+            _dict_cols = {'.'.join(c.meta_data.path_in_schema)
+                          for rg in rgs for c in rg.columns
+                          if _dict_encodings.intersection(c.meta_data.encodings or ())}
             for col in df.columns:
                 if (df[col].dtype == np.dtype('O')
                         and col not in _cats
                         and col not in _schema_evo_cols
+                        and col not in _dict_cols
                         and _user_dtypes.get(col) != np.dtype('O')):
                     arrow_string_columns[col] = []
             # Also check index columns that are object dtype
             if hasattr(df.index, 'dtype') and df.index.dtype == np.dtype('O'):
                 idx_name = df.index.name
-                if idx_name and idx_name in columns and idx_name not in _schema_evo_cols:
+                if (idx_name and idx_name in columns and idx_name not in _schema_evo_cols
+                        and idx_name not in _dict_cols):
                     arrow_string_columns[idx_name] = []
 
         start = 0
